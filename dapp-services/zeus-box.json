@@ -1,6 +1,7 @@
 {
   "ignore": [
     "README.md",
+    "LICENSE",    
     "zeus-box.json"
   ],
   "dependencies":["seed-microservices","core-extensions","demux", "seed-eos", "events", "seed-models","hooks-cpp-contracts"],
