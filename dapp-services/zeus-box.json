@@ -4,7 +4,7 @@
     "LICENSE",    
     "zeus-box.json"
   ],
-  "dependencies":["seed-microservices","core-extensions","demux", "seed-eos", "events", "seed-models","hooks-cpp-contracts"],
+  "dependencies":["seed","seed-microservices","core-extensions","demux", "seed-eos", "events", "seed-models","hooks-cpp-contracts"],
   "install": {
     "npm": {
       "big-integer": "^1.6.36",
