@@ -1,0 +1,12 @@
+{
+  "ignore": [
+    "README.md",
+    "zeus-box.json"
+  ],
+  "commands": {
+    "Run dapp-services node": "docker-compose up"
+  },
+  "dependencies":[
+    "coldtoken"
+  ]
+}

@@ -1,0 +1,9 @@
+gw:
+    image: dappservices
+    cmd: node services/dapp-services-node/index.js
+log:
+    image: dappservices
+    cmd: node services/log-dapp-service-node/index.js
+ipfs:
+    image: dappservices
+    cmd: node services/ipfs-dapp-service-node/index.js
