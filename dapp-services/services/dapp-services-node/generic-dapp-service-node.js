@@ -3,7 +3,9 @@
 require("babel-core/register");
 require("babel-polyfill");
 require('daemonize-process')();
-
+if(process.env.DAEMONIZE_PROCESS)
+    require('daemonize-process')();
+    
 const {loadModels} = require("../../extensions/tools/models")
 const {getCreateKeys} = require('../../extensions/tools/eos/utils');
 const {deserialize, generateABI, genNode, eosPrivate, paccount, forwardEvent, resolveProviderData, resolveProvider} = require('./common');
