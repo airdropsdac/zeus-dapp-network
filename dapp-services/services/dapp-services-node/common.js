@@ -1,4 +1,4 @@
-const paccount = process.env.PROOF_PROVIDER_ACCOUNT || "pprovider1";
+const paccount = process.env.DSP_ACCOUNT || process.env.PROOF_PROVIDER_ACCOUNT || "pprovider1";
 const fetch = require('node-fetch');
 const {dappServicesContract} = require("../../extensions/tools/eos/dapp-services")
 const {loadModels} = require("../../extensions/tools/models");

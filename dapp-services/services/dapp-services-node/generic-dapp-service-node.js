@@ -26,13 +26,15 @@ const handleRequest = async(handler,act,serviceName, abi)=>{
 
         var contract = await eosPrivate.contract(payer);
         
-        var key = await getCreateKeys(paccount);
+        let key;
+        if(!process.env.DSP_PRIVATE_KEY)
+            key = await getCreateKeys(paccount);
         try{
             await contract[response.action](response.payload,{
                 authorization: `${paccount}@active`,
                 broadcast: true,
                 sign: true,
-                keyProvider:  [key.privateKey]    
+                keyProvider:  [process.env.DSP_PRIVATE_KEY || key.privateKey]    
             });
         }
         catch(e){

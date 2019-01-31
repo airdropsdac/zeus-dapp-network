@@ -4,7 +4,7 @@
     "zeus-box.json"
   ],
   "commands": {
-    "Run dapp-services node": "docker-compose up"
+    "Deploy DSP": "cat README.md"
   },
   "dependencies":[
     "coldtoken"
