@@ -21,7 +21,13 @@ zeus unbox dapp-services-deploy
 ```
 cd dapp-services-deploy
 zeus compile
-DSP_PRIVATE_KEY=your_dsp_private_key DSP_ACCOUNT=dsprovider55 IPFS_HOST=localhost NODEOS_HOST=localhost NODEOS_CHAINID=... NODEOS_WEBSOCKET_PORT=8889 zeus start-localenv
+DSP_PRIVATE_KEY=your_dsp_private_key \
+    DSP_ACCOUNT=dsprovider55 \
+    IPFS_HOST=localhost \
+    NODEOS_HOST=localhost \
+    NODEOS_CHAINID=... \
+    NODEOS_WEBSOCKET_PORT=8889 \
+    zeus start-localenv
 ```
 
 ### Logs
