@@ -7,3 +7,6 @@ log:
 ipfs:
     image: dappservices
     cmd: node services/ipfs-dapp-service-node/index.js
+demux:
+    image: dappservices
+    command: node services/demux/index.js
