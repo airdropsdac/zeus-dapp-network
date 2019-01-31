@@ -1,4 +1,4 @@
-# Installing a DSP
+# Deploying a DSP
 
 ## Prerequistes
 - EOSIO node with the following configuration:
@@ -10,6 +10,7 @@ contracts-console = true
 ```
 - IPFS Cluster
 
+## Create an EOS Account for your DSP
 ## Install & Run
 ### Install the Zeus SDK
 
@@ -36,7 +37,6 @@ DSP_PRIVATE_KEY=your_dsp_private_key \
 TBD
 
 ## Register
-### Create EOS account
 ### Register DSP
 TBD
 
