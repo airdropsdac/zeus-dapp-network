@@ -1,12 +1,14 @@
 # Installing a DSP
 
 ## Prerequistes
-- nodeos with the following configuration:
--       plugin = eosio::state_history_plugin
--       state-history-endpoint = 0.0.0.0:8889
--       trace-history = true
--       contracts-console = true
-- ipfs cluster
+- EOSIO node with the following configuration:
+```
+plugin = eosio::state_history_plugin
+state-history-endpoint = 0.0.0.0:8889
+trace-history = true
+contracts-console = true
+```
+- IPFS Cluster
 
 ## Install & Run
 ### Install the Zeus SDK
