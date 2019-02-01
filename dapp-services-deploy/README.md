@@ -1,4 +1,4 @@
-# Installing a DSP
+# Running a DSP
 
 ## Prerequistes
 - nodeos with the following configuration:
