@@ -1,9 +1,51 @@
+# WIP
 gw:
     image: dappservices
-    cmd: node services/dapp-services-node/index.js
+    command: node services/dapp-services-node/index.js
+    ports:
+            - 8888:3115
+            - 8812:8812
+    links:
+            - log:log
+            - ipfs:ipfs
+    env_file:
+            - dappservices.env
+    restart: always
 log:
     image: dappservices
-    cmd: node services/log-dapp-service-node/index.js
+    command: node services/log-dapp-service-node/index.js
+    env_file:
+            - dappservices.env
+    ports:
+            - 13110:13110
+    restart: always
 ipfs:
     image: dappservices
-    cmd: node services/ipfs-dapp-service-node/index.js
+    command: node services/ipfs-dapp-service-node/index.js
+    env_file:
+            - dappservices.env
+    links:
+            - ipfsnode:ipfsnode
+    ports:
+            - 13115:13115
+    restart: always
+demux:
+    image: dappservices
+    command: node services/demux/index.js
+    env_file:
+            - dappservices.env
+    links:
+            - gw:gw
+    restart: always
+ipfsnode:
+    image: ipfs/go-ipfs:latest
+    restart: always
+    ports:
+            - 4001:4001
+            - 5001:5001
+            - 8080:8080
+    environment:
+            IPFS_PROFILE: server
+    volumes:
+            - /data/ipfs/data:/data/ipfs
+            - /data/ipfs/export:/export
