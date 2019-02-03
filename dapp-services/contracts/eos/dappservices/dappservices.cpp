@@ -357,7 +357,6 @@ public:
 
   ACTION xsignal(name service, name action, name provider,
                  std::vector<char> signalRawData) {
-    
     string str(signalRawData.begin(), signalRawData.end());
     auto encodedData = fc::base64_encode(str);                                 
     EMIT_SIGNAL_SVC_EVENT(name(_code), service, action, provider, 
@@ -367,7 +366,9 @@ public:
   }
 
   ACTION selectpkg(name owner, name provider, name service, name package) {
+    require_auth(owner);
     choose_package(owner, service, provider, package);
+    require_recipient(provider);
   }
 
   ACTION stake(name from, name provider, name service, asset quantity) {

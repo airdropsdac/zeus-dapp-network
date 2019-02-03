@@ -168,6 +168,7 @@ struct usage_t {
 
 #define XSIGNAL_DAPPSERVICE_ACTION \
     SVC_ACTION_METHOD_NOC(signal,((name)(service))((name)(action))((name)(provider))((std::vector<char>)(signalRawData))){ \
+        require_auth2(_self, "dsp"_n); \
         require_recipient(DAPPSERVICES_CONTRACT);  \
     }
 

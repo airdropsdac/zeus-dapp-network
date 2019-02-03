@@ -43,7 +43,8 @@ public:
 
   ACTION xsignal(name service, name action,
                  name provider, std::vector<char> signalRawData) {
-    if (current_receiver() != service.value || _self != service)
+    require_auth2(_self, "dsp"_n); 
+    if (current_receiver() != service.value || _self != service) 
       return;
 
     ${M('HANDLECASE_SIGNAL_TYPE')}

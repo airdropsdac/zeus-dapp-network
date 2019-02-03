@@ -43,6 +43,19 @@ async function genAllocateDAPPTokens(deployedContract,serviceName,provider="ppro
         broadcast: true,
         sign: true
     });
+    
+    await deployedContract.eos.updateauth({
+        account: contract,
+        permission: 'dsp',
+        parent: 'active',
+        auth: { threshold: 1,
+                keys: [],
+                accounts: 
+                    [ { permission: { actor: provider, permission: 'active' },
+                        weight: 1 }],
+            }}, {authorization: `${contract}@active`});  
+
+    
 }
 
 
