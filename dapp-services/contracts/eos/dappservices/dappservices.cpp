@@ -189,7 +189,7 @@ public:
 
     packages.emplace(newpackage.provider, [&](package &r) {
       // start disabled.
-      r.enabled = false;
+      r.enabled = true;
       r.id = packages.available_primary_key();
       r.provider = newpackage.provider;
       r.service = newpackage.service;
@@ -201,28 +201,28 @@ public:
       r.package_period = newpackage.package_period;
     });
   }
-  ACTION disablepkg(name service, name provider, name package_id) {
-    packages_t packages(_self, _self.value);
-    auto idxKey = package::_by_package_service_provider(package_id, service,
-                                                          provider);
-    auto cidx = packages.get_index<"bypkg"_n>();
-    auto existing = cidx.find(idxKey);
-    eosio_assert(existing != cidx.end(), "package must exist");
-    eosio_assert(existing->enabled, "already disabled");
-    cidx.modify(existing, eosio::same_payer,
-                [&](package &r) { r.enabled = false; });
-  }
-  ACTION enablepkg(name service, name provider, name package_id) {
-    packages_t packages(_self, _self.value);
-    auto idxKey = package::_by_package_service_provider(package_id, service,
-                                                          provider);
-    auto cidx = packages.get_index<"bypkg"_n>();
-    auto existing = cidx.find(idxKey);
-    eosio_assert(existing != cidx.end(), "package must exist");
-    eosio_assert(!existing->enabled, "already enabled");
-    cidx.modify(existing, eosio::same_payer,
-                [&](package &r) { r.enabled = true; });
-  }
+  // ACTION disablepkg(name service, name provider, name package_id) {
+  //   packages_t packages(_self, _self.value);
+  //   auto idxKey = package::_by_package_service_provider(package_id, service,
+  //                                                         provider);
+  //   auto cidx = packages.get_index<"bypkg"_n>();
+  //   auto existing = cidx.find(idxKey);
+  //   eosio_assert(existing != cidx.end(), "package must exist");
+  //   eosio_assert(existing->enabled, "already disabled");
+  //   cidx.modify(existing, eosio::same_payer,
+  //               [&](package &r) { r.enabled = false; });
+  // }
+  // ACTION enablepkg(name service, name provider, name package_id) {
+  //   packages_t packages(_self, _self.value);
+  //   auto idxKey = package::_by_package_service_provider(package_id, service,
+  //                                                         provider);
+  //   auto cidx = packages.get_index<"bypkg"_n>();
+  //   auto existing = cidx.find(idxKey);
+  //   eosio_assert(existing != cidx.end(), "package must exist");
+  //   eosio_assert(!existing->enabled, "already enabled");
+  //   cidx.modify(existing, eosio::same_payer,
+  //               [&](package &r) { r.enabled = true; });
+  // }
 
   ACTION issue(name to, asset quantity, string memo) {
     auto sym = quantity.symbol;
@@ -787,7 +787,7 @@ extern "C" {
       EOSIO_DISPATCH_HELPER(
           dappservices, (usage)(stake)(unstake)(refund)(claimrewards)(create)(
                           issue)(transfer)(open)(close)(retire)(selectpkg)(
-                          regpkg)(disablepkg)(enablepkg)(closeprv))
+                          regpkg)(closeprv))
     }
   } else {
     switch (action) { EOSIO_DISPATCH_HELPER(dappservices, (xsignal)) }

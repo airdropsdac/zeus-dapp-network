@@ -2,7 +2,6 @@
 
 require("babel-core/register");
 require("babel-polyfill");
-require('daemonize-process')();
 if(process.env.DAEMONIZE_PROCESS)
     require('daemonize-process')();
     
