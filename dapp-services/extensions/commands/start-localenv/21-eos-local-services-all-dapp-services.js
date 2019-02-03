@@ -46,16 +46,16 @@ async function deployLocalService(serviceModel) {
         sign: true,
         keyProvider:[key.privateKey]
     });
-    await deployedServices.contractInstance.enablepkg({
-            package_id:"default",
-            service: serviceContract,
-            provider,
-    }, {
-        authorization: `${provider}@active`,
-        broadcast: true,
-        sign: true,
-        keyProvider:[key.privateKey]
-    });
+    // await deployedServices.contractInstance.enablepkg({
+    //         package_id:"default",
+    //         service: serviceContract,
+    //         provider,
+    // }, {
+    //     authorization: `${provider}@active`,
+    //     broadcast: true,
+    //     sign: true,
+    //     keyProvider:[key.privateKey]
+    // });
     
     // reg provider and model model
     var serviceC = artifacts.require(`./${serviceName}service/`);

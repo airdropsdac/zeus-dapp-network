@@ -223,9 +223,11 @@ const genNode = async (actionHandlers, port, serviceName, handlers, abi)=>{
                     if(detailMsg){
                         
                         var jsons = details[details.indexOf(detailMsg)+1].message.split(': ',2)[1].split('\n').filter(a=>a.trim() != '');
-                        for (var i = 0; i < jsons.length-1; i++) {
+                        var currentEvent;
+                        for (var i = 0; i < jsons.length; i++) {
+                            
                             try{
-                                var currentEvent = JSON.parse(jsons[i]);
+                                currentEvent = JSON.parse(jsons[i]);
                             }
                             catch(e){
                                 continue;
@@ -234,9 +236,10 @@ const genNode = async (actionHandlers, port, serviceName, handlers, abi)=>{
                                 event:currentEvent,
                                 exception: true
                             }
-                            await processFn(actionHandlers, currentActionObject, true, serviceName, handlers);
+                            if(i < jsons.length-1)
+                                await processFn(actionHandlers, currentActionObject, true, serviceName, handlers);
                         }
-                        var event = JSON.parse(jsons[jsons.length-1]);    
+                        var event = currentEvent;
                         var actionObject =  {
                             event,
                             exception: true
