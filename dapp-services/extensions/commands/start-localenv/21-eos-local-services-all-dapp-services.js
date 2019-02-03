@@ -35,7 +35,7 @@ async function deployLocalService(serviceModel) {
             enabled: 0,
             service: serviceContract,
             package_id:"default",
-            quota:"1.0000 DAPP",
+            quota:"1.0000 QUOTA",
             min_stake_quantity:"1.0000 DAPP",
             min_unstake_period:10,
             package_period: 10

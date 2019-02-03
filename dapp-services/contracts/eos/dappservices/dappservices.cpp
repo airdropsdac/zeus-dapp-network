@@ -185,7 +185,7 @@ public:
     auto existing = cidx.find(idxKey);
     eosio_assert(existing == cidx.end(), "already exists");
 
-    eosio_assert(newpackage.quota.symbol == DAPPSERVICES_SYMBOL, "wrong symbol");
+    eosio_assert(newpackage.quota.symbol == DAPPSERVICES_QUOTA_SYMBOL, "wrong symbol");
 
     packages.emplace(newpackage.provider, [&](package &r) {
       // start disabled.
@@ -552,7 +552,7 @@ private:
       a.service = service;
       a.account = owner;
       a.balance.symbol = DAPPSERVICES_SYMBOL;
-      a.quota.symbol = DAPPSERVICES_SYMBOL;
+      a.quota.symbol = DAPPSERVICES_QUOTA_SYMBOL;
     });
 
   }

@@ -26,6 +26,7 @@ using eosio::key256;
 using eosio::symbol_code;
 #define DAPPSERVICES_CONTRACT "dappservices"_n
 #define DAPPSERVICES_SYMBOL symbol(symbol_code("DAPP"), 4)
+#define DAPPSERVICES_QUOTA_SYMBOL symbol(symbol_code("QUOTA"), 4)
 #define EXPAND(...) __VA_ARGS__
 #define XSTR(x) #x
 #define STR(x) XSTR(x)
