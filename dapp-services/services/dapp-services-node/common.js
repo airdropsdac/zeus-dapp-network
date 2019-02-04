@@ -7,6 +7,7 @@ const bodyParser = require('body-parser');
 const express = require('express');
 const cors = require('cors');
 const httpProxy = require('http-proxy');
+import BigNumber from 'bignumber.js';
 
 const networks = [
     {
@@ -79,7 +80,6 @@ const resolveExternalProviderData = async (service, provider)=>{
         "scope": provider,
         "code": service,
         "table": "providermodel",
-        "lower_bound": "providermodel",
         "limit": 1
     });
     if(!res.rows.length)
@@ -91,9 +91,45 @@ const resolveExternalProviderData = async (service, provider)=>{
     }
 }
 
-const resolveProviderData = async (service, provider)=>{
-    return ((paccount == provider) ? resolveBackendServiceData : resolveExternalProviderData) (service, provider);
+
+const resolveProviderData = async (service, provider)=>
+    ((paccount == provider) ? resolveBackendServiceData : resolveExternalProviderData) (service, provider);
+
+const toBound = (numStr) =>
+   `0x${(new Array(33).join('0') + numStr).substring(numStr.length).toUpperCase()}`;
+const resolveProviderPackage = async (payer, service, provider)=>{
+    var encodedPayer = new BigNumber(Eos.modules.format.encodeName(payer, false));
+    var encodedService = new BigNumber(Eos.modules.format.encodeName(service, false));
+    var key = shiftLeft(encodedPayer, 64).plus(encodedService);
+    var serviceWithStakingResult = await eosPrivate.getTableRows({
+        "json": true,
+        "scope": "DAPP",
+        "code": dappServicesContract,
+        "table": "accountext",
+        // "table_key": 'byext',
+        // "key_type": "i128",
+        // "index_position": 3,
+        // "lower_bound":toBound(key.toString(16)),
+        // "upper_bound":toBound(key.plus(1).toString(16)),
+        "limit": 500
+    });
+
+    // console.log("found",serviceWithStakingResult.rows);
+    var serviceWithStaking = serviceWithStakingResult.rows.filter(a=>a.provider == provider);
+    var pkg = serviceWithStaking[0].package;
+    if(pkg == "")
+        pkg = serviceWithStaking[0].pending_package;
+    return pkg;
 }
+
+var shiftLeft = function (bignum, n) {
+    n = +n.toString();
+    var b = bignum.abs().integerValue(BigNumber.ROUND_FLOOR).toString(2);
+    b += '0'.repeat(n);
+    if ( bignum.isNegative() ) b = '-' + b;
+    return new BigNumber( b, 2 );
+};
+
 
 const resolveProvider = async (payer, service, provider)=>{
     if(provider != "")
@@ -102,40 +138,54 @@ const resolveProvider = async (payer, service, provider)=>{
     console.log(`resolving provider for payer:${payer} service:${service} ${provider == "" ? '' : 'provider:'}${provider}`);
     // resolve provider
     // get from specific service contract table (providermodel)
-    var loadedInExtensionResult = await eosPrivate.getTableRows({
-        "json": true,
-        "scope": service,
-        "code": service,
-        "table": "providermdl",
-        "limit": 100
-    });
-    console.log(loadedInExtensionResult);
+    // var loadedInExtensionResult = await eosPrivate.getTableRows({
+    //     "json": true,
+    //     "scope": service,
+    //     "code": service,
+    //     "table": "providermdl",
+    //     "lower_bound": payer,
+    //     "limit": 100
+    // });
+    // console.log(loadedInExtensionResult);
     // intersect with table at services contract (accountext) - secondary index
+    var encodedPayer = new BigNumber(Eos.modules.format.encodeName(payer, false));
+    var encodedService = new BigNumber(Eos.modules.format.encodeName(service, false));
+    var key = shiftLeft(encodedPayer, 64).plus(encodedService);
     var serviceWithStakingResult = await eosPrivate.getTableRows({
         "json": true,
-        "scope": payer,
+        "scope": "DAPP",
         "code": dappServicesContract,
         "table": "accountext",
-        "lower_bound": payer,
-        "limit": 100
+        // "table_key": 'byext',
+        // "key_type": "i128",
+        // "index_position": 3,
+        // "lower_bound":toBound(key.toString(16)),
+        // "upper_bound":toBound(key.plus(1).toString(16)),
+        "limit": 500
     });
-    console.log(loadedInExtensionResult);
-    var loadedInExtensions = loadedInExtensionResult.rows.map(a=>a.provider);
-    var serviceWithStaking = serviceWithStakingResult.rows.map(a=>a.provider);
+    // console.log(loadedInExtensionResult);
+    // var loadedInExtensions = loadedInExtensionResult.rows.map(a=>a.provider);
+    var serviceWithStaking = serviceWithStakingResult.rows;
     // prefer self
-    var intersectLists = loadedInExtensions.filter(value => -1 !== serviceWithStaking.indexOf(value));
+    var intersectLists = serviceWithStaking.filter(accountProvider=>accountProvider.model !== "").map(a=>a.provider);
     if(intersectLists.indexOf(paccount) !== -1)
         return paccount;
     
-    // take randomly
-    return intersectLists[0];
+    return intersectLists[Math.floor(Math.random()*intersectLists.length)];
 }
 
 const processFn = async (actionHandlers, actionObject, simulated, serviceName, handlers) =>{
     var actionHandler = actionHandlers[actionObject.event.etype];
     if(!actionHandler)
         return;
-    return actionHandler(actionObject, simulated, serviceName, handlers);
+    try{
+        return await actionHandler(actionObject, simulated, serviceName, handlers);
+    }
+    catch(e)
+    {
+        console.error(e);
+        throw e;
+    }
 }
 
 async function parsedAction(actionHandlers, account,method,code,actData, events, simulated, serviceName, handlers){
@@ -148,7 +198,7 @@ async function parsedAction(actionHandlers, account,method,code,actData, events,
             data: actData, 
             event
         }
-        processFn(actionHandlers, actionObject, simulated, serviceName, handlers);
+        await processFn(actionHandlers, actionObject, simulated, serviceName, handlers);
     }
 }
 
@@ -363,4 +413,4 @@ const generateABI =
 
 
 
-module.exports = {deserialize, generateABI, genNode, genApp, forwardEvent, resolveProviderData, resolveProvider, processFn, handleAction, paccount, proxy, eosPrivate, eosconfig, nodeosEndpoint}
+module.exports = {deserialize, generateABI, genNode, genApp, forwardEvent, resolveProviderData, resolveProvider, processFn, handleAction, paccount, proxy, eosPrivate, eosconfig, nodeosEndpoint, resolveProviderPackage}

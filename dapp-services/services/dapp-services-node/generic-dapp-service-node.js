@@ -7,8 +7,8 @@ if(process.env.DAEMONIZE_PROCESS)
     
 const {loadModels} = require("../../extensions/tools/models")
 const {getCreateKeys} = require('../../extensions/tools/eos/utils');
-const {deserialize, generateABI, genNode, eosPrivate, paccount, forwardEvent, resolveProviderData, resolveProvider} = require('./common');
-const handleRequest = async(handler,act,serviceName, abi)=>{
+const {deserialize, generateABI, genNode, eosPrivate, paccount, forwardEvent, resolveProviderData, resolveProvider, resolveProviderPackage} = require('./common');
+const handleRequest = async(handler,act,packageid, serviceName, abi)=>{
     let {service, payer, provider, action, data} = act.event;
     data = deserialize(abi, data, action);
         if(!data)
@@ -19,7 +19,7 @@ const handleRequest = async(handler,act,serviceName, abi)=>{
     if(!responses)
         return;
     if(!Array.isArray(responses)) // needs conversion from a normal object
-        responses = respond(act.event, responses);
+        responses = respond(act.event,packageid, responses);
 
     await Promise.all(responses.map(async (response)=>{
 
@@ -50,17 +50,19 @@ const actionHandlers = {
         var handler = handlers[action];
         var models = await loadModels('dapp-services');        
         var model = models.find(m=>m.name == serviceName);
+        provider = await resolveProvider(payer, service, provider);
+        var packageid = await resolveProviderPackage(payer, service, provider);
         if(!simulated){
             if(!(model.contract == service && handler))
-                return;
-            await handleRequest(handler,act,serviceName, handlers.abi);
+                return;            
+            await handleRequest(handler,act, packageid,serviceName, handlers.abi);
             return;
         }
         if(!act.exception)
             return;
-        provider = await resolveProvider(payer, service, provider);
+        
         if(model.contract == service && handler){
-            await handleRequest(handler,act,serviceName, handlers.abi);
+            await handleRequest(handler,act, packageid,serviceName, handlers.abi);
             return "retry";
         }
         var providerData = await resolveProviderData(service, provider);
@@ -105,8 +107,9 @@ const nodeFactory = async (serviceName, handlers)=>{
     return genNode(actionHandlers, model.port, serviceName, handlers, await generateABI(model));
 }
 
-const respond = (request,payload)=>{
+const respond = (request,packageid,payload)=>{
     payload.current_provider = request.current_provider;
+    payload.package = packageid;
     return [{
         action: `x${request.action}`,
         payload,

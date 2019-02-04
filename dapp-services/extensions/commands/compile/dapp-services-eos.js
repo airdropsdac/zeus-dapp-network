@@ -37,16 +37,17 @@ public:
   };
   TABLE providermdl {
     model_t model;
-    std::string endpoint;
+    name package_id;
+    uint64_t primary_key() const { return package_id.value; }
   };
-  typedef eosio::singleton<"providermdl"_n, providermdl> providermodels_t;
+    
+  typedef eosio::multi_index<"providermdl"_n, providermdl> providermodels_t;  
 
   ACTION xsignal(name service, name action,
-                 name provider, std::vector<char> signalRawData) {
-    require_auth2(_self, "dsp"_n); 
+                 name provider, name package, std::vector<char> signalRawData) {
     if (current_receiver() != service.value || _self != service) 
       return;
-
+    require_auth(_code);
     ${M('HANDLECASE_SIGNAL_TYPE')}
   }
   DAPPSERVICE_PROVIDER_BASIC_ACTIONS
@@ -76,8 +77,8 @@ const generateServiceAbiFile = (serviceModel)=>{
                         "type": "model_t"
                     },
                     {
-                        "name": "endpoint",
-                        "type": "string"
+                        "name": "package_id",
+                        "type": "name"
                     }
                 ]
             },
@@ -95,6 +96,10 @@ const generateServiceAbiFile = (serviceModel)=>{
                     },
                     {
                         "name": "provider",
+                        "type": "name"
+                    },
+                    {
+                        "name": "package",
                         "type": "name"
                     },
                     {
@@ -174,7 +179,7 @@ const generateCommandCodeText = (serviceName, commandName, commandModel, service
          ${fnArgs(commandModel.signal)}, \
          ${fnArgs(commandModel.callback)},"${serviceContract}"_n) { \
     _${serviceName}_${commandName}(${fnPassArgs(commandModel.callback)}); \
-    SEND_SVC_SIGNAL(${commandName}, current_provider, ${fnPassArgs(commandModel.signal)})                         \
+    SEND_SVC_SIGNAL(${commandName}, current_provider, package, ${fnPassArgs(commandModel.signal)})                         \
 };`                                                                            
 
 };

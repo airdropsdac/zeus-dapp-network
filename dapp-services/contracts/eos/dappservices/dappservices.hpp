@@ -40,15 +40,16 @@ using eosio::symbol_code;
   EVENTKV("service", service)                                              \
   EVENTKV("action", action)                                                    \
   EVENTKV("provider", provider)                                                \
-  EVENTKVL("data", encodedData)                                                \
+  EVENTKVL("data", encodedData)                           \
   END_EVENT()
 
-#define EMIT_SIGNAL_SVC_EVENT(payer, service, action, provider, encodedData) \
-  START_EVENT("service_signal", "1.0")                                       \
+#define EMIT_SIGNAL_SVC_EVENT(payer, service, action, provider, package, encodedData) \
+  START_EVENT("service_signal", "1.1")                                       \
   EVENTKV("payer", payer)                                                      \
   EVENTKV("service", service)                                              \
   EVENTKV("action", action)                                                    \
   EVENTKV("provider", provider)                                                \
+  EVENTKV("package", package)                                                \
   EVENTKVL("data", encodedData)                                                \
   END_EVENT()
 
@@ -84,8 +85,8 @@ using eosio::symbol_code;
       POPULATE_FIELDS(fields)                                                  \
       return curr;                                                             \
     }                                                                          \
-    void send(name provider = ""_n) {                                          \
-      signal_svc(service_contract, provider, *this);                         \
+    void send(name provider,name package)       {                      \
+      signal_svc(service_contract, provider, package, *this);                           \
     }                                                                          \
   };
 
@@ -109,8 +110,8 @@ using eosio::symbol_code;
 #define SEND_SVC_REQUEST(name, ...)                                            \
   REQUEST_NAME(name)::build(__VA_ARGS__).send(""_n);
 
-#define SEND_SVC_SIGNAL(name, provider, ...)                                   \
-  SIGNAL_NAME(name)::build(__VA_ARGS__).send(provider);
+#define SEND_SVC_SIGNAL(name, provider, package, ...)                                   \
+  SIGNAL_NAME(name)::build(__VA_ARGS__).send(provider, package);
 
 
 #define SVC_RESP_NAME(svc,name) \
@@ -122,7 +123,7 @@ using eosio::symbol_code;
 #define ACTION_NAME(name) x##name
 
 #define SVC_ACTION_METHOD(aname, args)                                         \
-  ACTION ACTION_NAME(aname)(name current_provider, BUILD_ARGS(args))
+  ACTION ACTION_NAME(aname)(name current_provider, name package, BUILD_ARGS(args))
 
 #define SVC_ACTION_METHOD_NOC(aname, args)                                         \
   ACTION ACTION_NAME(aname)(BUILD_ARGS(args))           
@@ -131,13 +132,13 @@ using eosio::symbol_code;
                    action_args, service_contract)                                                \
   SIGNAL_T(aname, signal_fields, service_contract)                                               \
   REQUEST_T(aname, fail_val, request_fields, service_contract)                                   \
-  static void signal_svc(name service, name provider,                        \
+  static void signal_svc(name service, name provider,name package,                        \
                          SIGNAL_NAME(aname) signalData) {                      \
     name actionName = TONAME(aname);                                           \
     std::vector<char> raw = eosio::pack<SIGNAL_NAME(aname)>(signalData);       \
     action(permission_level{name(current_receiver()), "active"_n},             \
            name(current_receiver()), "xsignal"_n,                              \
-           std::make_tuple(service, actionName, provider, raw))              \
+           std::make_tuple(service, actionName, provider, package, raw))       \
         .send();                                                               \
   }                                                                            \
   static void request_svc(name service, name provider,                       \
@@ -146,7 +147,7 @@ using eosio::symbol_code;
     std::vector<char> raw = eosio::pack<REQUEST_NAME(aname)>(request);         \
     string str(raw.begin(), raw.end());                                        \
     auto encodedData = fc::base64_encode(str);                                 \
-    EMIT_REQUEST_SVC_EVENT(name(current_receiver()), service, actionName,          \
+    EMIT_REQUEST_SVC_EVENT(name(current_receiver()), service, actionName,      \
                            provider, encodedData.c_str());                     \
     if (request.fail)                                                          \
       eosio_assert(false, "required service");                               \
@@ -162,13 +163,13 @@ struct usage_t {
   name provider;
   name payer;
   name service;
+  name package;
   bool success = false;
 };
 #endif
 
 #define XSIGNAL_DAPPSERVICE_ACTION \
-    SVC_ACTION_METHOD_NOC(signal,((name)(service))((name)(action))((name)(provider))((std::vector<char>)(signalRawData))){ \
-        require_auth2(_self, "dsp"_n); \
+    SVC_ACTION_METHOD_NOC(signal,((name)(service))((name)(action))((name)(provider))((name)(package))((std::vector<char>)(signalRawData))){ \
         require_recipient(DAPPSERVICES_CONTRACT);  \
     }
 
@@ -184,7 +185,7 @@ struct usage_t {
                        SIGNAL_NAME(signal) signalData) {                       \
       asset quantity;                                                          \
       quantity.amount = cost_per_action;                                       \
-      quantity.symbol = DAPPSERVICES_SYMBOL;                                     \
+      quantity.symbol = DAPPSERVICES_QUOTA_SYMBOL;                                     \
       MODEL_RESULT(quantity);                                                  \
     }                                                                          \
   };
@@ -230,7 +231,7 @@ struct usage_t {
 #define HANDLECASE_SIGNAL_TYPE(signal)                                         \
   if (action == TONAME(signal)) {                                              \
     _xsignal_provider<SIGNAL_NAME(signal)>(                                    \
-        action, provider,                                                      \
+        action, provider,package,                                              \
         eosio::unpack<SIGNAL_NAME(signal)>(signalRawData));                    \
     return;                                                                    \
   }
@@ -274,7 +275,10 @@ struct usage_t {
 
   TABLE package {
     uint64_t id;
-
+    
+    std::string api_endpoint;
+    std::string package_json_uri;
+    
     name package_id;
     name service;
     name provider;
@@ -285,7 +289,7 @@ struct usage_t {
     asset min_stake_quantity;
     uint32_t min_unstake_period; // commitment
     // uint32_t min_staking_period;
-    bool enabled;
+    // bool enabled;
 
     uint64_t primary_key() const { return id; }
     key256 by_package_service_provider() const {
@@ -311,6 +315,7 @@ struct usage_t {
     asset quota;
     asset balance;
     uint64_t last_usage;
+    uint64_t last_reward;
     name package;
     name pending_package;
     uint64_t package_started;
@@ -319,12 +324,11 @@ struct usage_t {
     key256 by_account_service_provider() const {
       return _by_account_service_provider(account, service, provider);
     }
-    key256 by_account_service() const {
+    uint128_t by_account_service() const {
       return _by_account_service(account, service);
     }
-    static key256 _by_account_service(name account, name service) {
-      return key256::make_from_word_sequence<uint64_t>(
-          0ULL, 0ULL, account.value, service.value);
+    static uint128_t _by_account_service(name account, name service) {
+      return (uint128_t{account.value}<<64) | service.value;
     }
     static key256 _by_account_service_provider(name account, name service,
                                                  name provider) {
@@ -361,7 +365,7 @@ struct usage_t {
                  const_mem_fun<accountext, key256,
                                &accountext::by_account_service_provider>>,
       indexed_by<"byext"_n,
-                 const_mem_fun<accountext, key256,
+                 const_mem_fun<accountext, uint128_t,
                                &accountext::by_account_service>>
                                >
       accountexts_t; 
@@ -390,7 +394,7 @@ void dispatchUsage(usage_t usage_report) {
 
 #define DAPPSERVICE_PROVIDER_ACTIONS                                               \
   template <typename T>                                                        \
-  void _xsignal_provider(name actionName, name provider, T signalData) {       \
+  void _xsignal_provider(name actionName, name provider,name package, T signalData) {       \
     auto payer = _code;                                                        \
     std::vector<name> providers;                                               \
     if (provider != ""_n)                                                      \
@@ -398,31 +402,29 @@ void dispatchUsage(usage_t usage_report) {
     else                                                                       \
       providers = getProvidersForAccount(payer, name(current_receiver()));     \
     require_auth(payer);                                                       \
-    auto fired = false;                                                        \
-    for (auto currentProvider : providers) {                                   \
+    auto currentProvider = provider;                                            \
       providermodels_t providermodels(_self, currentProvider.value);           \
-      if (!providermodels.exists())                                             \
-        continue;                                                              \
-      auto providerModel = providermodels.get();                               \
-      fired = true;                                                            \
-      auto model = providerModel.model;                                        \
+      auto providerModel = providermodels.find(package.value);                       \
+      eosio_assert (providerModel != providermodels.end(), "package not found");\
+      auto model = providerModel->model;                                        \
       auto usageResult = model.calc_usage(payer, currentProvider, signalData); \
       usageResult.provider = currentProvider;                                  \
       usageResult.payer = payer;                                               \
+      usageResult.package = package;                                               \
       usageResult.service = name(current_receiver());                        \
       dispatchUsage(usageResult);                                              \
-    }                                                                          \
-    if (!fired)                                                                \
-      eosio_assert(false, "no providers");                                     \
   }
 
 #define DAPPSERVICE_PROVIDER_BASIC_ACTIONS                                       \
   ACTION regprovider(name provider, providermdl model) {                       \
     require_auth(provider);                                                    \
     providermodels_t providermodels(_self, provider.value);                    \
-    eosio_assert(!providermodels.exists(),                                     \
-                 "already registered for this service");                     \
-    providermodels.set(model, provider);                                       \
+    auto providerModel = providermodels.find(model.package_id.value);                       \
+    eosio_assert(providerModel == providermodels.end(), "already exists");\
+    providermodels.emplace(provider, [&](auto &s) {\
+          s.model = model.model;\
+          s.package_id = model.package_id;\
+    });\
   }
 
 #define EOSIO_DISPATCH_SVC_PROVIDER(contract)                                  \

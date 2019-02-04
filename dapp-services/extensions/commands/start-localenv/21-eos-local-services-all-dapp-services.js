@@ -33,6 +33,8 @@ async function deployLocalService(serviceModel) {
             id:0,
             provider,
             enabled: 0,
+            api_endpoint:`http://localhost:${serviceModel.port}`,
+            package_json_uri:"",
             service: serviceContract,
             package_id:"default",
             quota:"1.0000 QUOTA",
@@ -64,8 +66,8 @@ async function deployLocalService(serviceModel) {
     await deployedService.contractInstance.regprovider({
         provider,
         model:{
+            package_id:"default",
             model:generateModel(Object.keys(serviceModel.commands)),
-            endpoint:`http://localhost:${serviceModel.port}`,
         }
     }, {
         authorization: `${provider}@active`,

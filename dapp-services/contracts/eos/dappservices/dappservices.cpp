@@ -4,12 +4,13 @@
 using namespace eosio;
 
 #define EMIT_USAGE_REPORT_EVENT(usageResult)                                   \
-  START_EVENT("usage_report", "1.3")                                           \
+  START_EVENT("usage_report", "1.4")                                           \
   EVENTKV("payer", (usageResult).payer)                                        \
   EVENTKV("service", (usageResult).service)                                \
   EVENTKV("provider", (usageResult).provider)                                  \
   EVENTKV("quantity", (usageResult).quantity)                                  \
-  EVENTKVL("success", (usageResult).success)                                   \
+  EVENTKV("success", (usageResult).success)                                   \
+  EVENTKVL("package", (usageResult).package)                                   \
   END_EVENT()
 
 CONTRACT dappservices : public eosio::contract {
@@ -53,7 +54,10 @@ public:
 
   TABLE package {
     uint64_t id;
-
+    
+    std::string api_endpoint;
+    std::string package_json_uri;
+    
     name package_id;
     name service;
     name provider;
@@ -100,12 +104,11 @@ public:
     key256 by_account_service_provider() const {
       return _by_account_service_provider(account, service, provider);
     }
-    key256 by_account_service() const {
+    uint128_t by_account_service() const {
       return _by_account_service(account, service);
     }
-    static key256 _by_account_service(name account, name service) {
-      return key256::make_from_word_sequence<uint64_t>(
-          0ULL, 0ULL, account.value, service.value);
+    static uint128_t _by_account_service(name account, name service) {
+      return ((uint128_t)account.value<<64)+service.value;
     }
     static key256 _by_account_service_provider(name account, name service,
                                                  name provider) {
@@ -140,7 +143,7 @@ public:
                  const_mem_fun<accountext, key256,
                                &accountext::by_account_service_provider>>,
       indexed_by<"byext"_n,
-                 const_mem_fun<accountext, key256,
+                 const_mem_fun<accountext, uint128_t,
                                &accountext::by_account_service>>
                                >
       accountexts_t; 
@@ -355,11 +358,12 @@ public:
     return ac.balance;
   }
 
-  ACTION xsignal(name service, name action, name provider,
+  ACTION xsignal(name service, name action, name provider, name package,
                  std::vector<char> signalRawData) {
+    require_auth(_code);
     string str(signalRawData.begin(), signalRawData.end());
     auto encodedData = fc::base64_encode(str);                                 
-    EMIT_SIGNAL_SVC_EVENT(name(_code), service, action, provider, 
+    EMIT_SIGNAL_SVC_EVENT(name(_code), service, action, provider, package,
                           encodedData.c_str());
     require_recipient(service);
     require_recipient(provider);
@@ -447,6 +451,7 @@ public:
     auto service = usage_report.service;
     auto provider = usage_report.provider;
     auto quantity = usage_report.quantity;
+    auto package = usage_report.package;
     require_recipient(provider);
     require_recipient(service);
     require_recipient(payer);
@@ -558,7 +563,7 @@ private:
 
   }
   bool sub_quota(name owner, name service, name provider, asset quantity) {
-    accountexts_t accountexts(_self, quantity.symbol.code().raw());
+    accountexts_t accountexts(_self, DAPPSERVICES_SYMBOL.code().raw());
     auto idxKey =
         accountext::_by_account_service_provider(owner, service, provider);
     auto cidx = accountexts.get_index<"byprov"_n>();
@@ -575,7 +580,7 @@ private:
   }
   void add_quota(name owner, name service, name provider, asset quantity) {
     // set account->provider->service->last_quota
-    accountexts_t accountexts(_self, quantity.symbol.code().raw());
+    accountexts_t accountexts(_self, DAPPSERVICES_SYMBOL.code().raw());
     auto idxKey =
         accountext::_by_account_service_provider(owner, service, provider);
     auto cidx = accountexts.get_index<"byprov"_n>();
