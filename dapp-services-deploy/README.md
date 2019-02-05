@@ -37,41 +37,8 @@ DSP_PRIVATE_KEY=your_dsp_private_key \
 TBD
 
 ## Register
-
-### dsp-package.json (draft)
-```
-{
-    "name": "Package 1",
-    "description": "Best for low vgrabs",
-    "dsp_json_uri": "https://acme-dsp.com/package1.dsp-package.json",
-    "logo":{
-      "logo_256":"https://....",
-      "logo_1024":"https://....",
-      "logo_svg":"https://...."
-    },
-    "service_level_agreement": {
-        "availability":{
-            "uptime_9s": 5
-        },
-        "performance":{
-            "95": 500,
-        },
-    },
-    "pinning":{
-        "ttl": 2400,
-        "public": false
-    },
-    "locations":[
-        {
-          "name": "Atlantis",
-          "country": "ATL",
-          "latitude": 2.082652,
-          "longitude": 1.781132
-        }
-    ]
-}
-```
-### dsp.json (draft)
+### Prepare and host dsp.json 
+(draft)
 ```
 {
     "name": "acme DSP",
@@ -105,6 +72,41 @@ TBD
 }
 
 ```
+### Prepare and host dsp-package.json 
+(draft)
+```
+{
+    "name": "Package 1",
+    "description": "Best for low vgrabs",
+    "dsp_json_uri": "https://acme-dsp.com/dsp.json",
+    "logo":{
+      "logo_256":"https://....",
+      "logo_1024":"https://....",
+      "logo_svg":"https://...."
+    },
+    "service_level_agreement": {
+        "availability":{
+            "uptime_9s": 5
+        },
+        "performance":{
+            "95": 500,
+        },
+    },
+    "pinning":{
+        "ttl": 2400,
+        "public": false
+    },
+    "locations":[
+        {
+          "name": "Atlantis",
+          "country": "ATL",
+          "latitude": 2.082652,
+          "longitude": 1.781132
+        }
+    ]
+}
+```
+
 
 ### Register Package
 ```
