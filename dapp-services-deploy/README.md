@@ -37,8 +37,26 @@ DSP_PRIVATE_KEY=your_dsp_private_key \
 TBD
 
 ## Register
-### Register DSP
+
+### dsp-package.json
+TBD
+
+### dsp.json
 TBD
 
 ### Register Package
-TBD
+```
+zeus register dapp-service-provider-package \
+    ipfservices myprovider package1 \
+    --key $ACTIVE_PRIVATE_KEY \
+    --min-stake-quantity 1.000 \
+    --package-period 3600 \
+    --quota 0.100 \
+    --api-endpoint https://api.acme-dsp.com \
+    --package-json-uri https://acme-dsp.com/dsp-package.json
+```
+
+For more package options:
+```
+zeus register dapp-service-provider-package --help 
+```
