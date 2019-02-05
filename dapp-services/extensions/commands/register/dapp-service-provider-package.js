@@ -1,4 +1,5 @@
 var {loadModels} = require('../../tools/models');
+var {getEos} = require('../../tools/eos/utils');
 var generateModel = (commandNames, cost_per_action = 1) =>{
     var model = {};
     commandNames.forEach(a=>{
@@ -26,13 +27,18 @@ module.exports = {
                         default: 60 * 60 * 24
                 }).option('quota', {
                         describe: 'Package Quota',
-                        default: "10.000"
+                        type:"string",
+                        default: "10.0000"
                 }).option('price-per-action', {
                         describe: 'Milli-QUOTA per service action',
                         default: 1
                 }).option('min-stake-quantity', {
                         describe: 'Minimum Stake',
-                        default: "10.000"
+                        type:"string",
+                        default: "10.0000"
+                }).option('dappservices-contract', {
+                        describe: 'dappservices contract account (only for testing)',
+                        default: "dappservices"
                 }).demandOption(['key','api-endpoint','package-json-uri']);
     },
     command: `${cmd} <service> <provider> <package-id>`,
@@ -40,9 +46,13 @@ module.exports = {
         var key = args.key;
         var models = await loadModels('dapp-services');
         var serviceModel = models.find(a=>a.name == args['service']);
+        if(!serviceModel)
+            throw new Error("service not found: " + args['service']);
         var serviceContract = serviceModel.contract;
-        var contractInstance;
+        var eos = await getEos();
+        var contractInstance = await eos.contract(args['dappservices-contract']);
         
+        try{
         await contractInstance.regpkg({
             newpackage:{
                 id:0,
@@ -64,6 +74,7 @@ module.exports = {
             keyProvider:[key]
         });
         
+        contractInstance = await eos.contract(serviceContract);
         await contractInstance.regprovider({
             provider:args['provider'],
             model:{
@@ -74,9 +85,14 @@ module.exports = {
             authorization: `${args['provider']}@active`,
             broadcast: true,
             sign: true,
-            keyProvider:[key.privateKey]
+            keyProvider:[key]
         });
-
+        }
+        catch(e){
+            console.log("failed",e);
+            return;
+        }
+        console.log(`package:${args['package-id']} registered successfully`)
     }
 }
 

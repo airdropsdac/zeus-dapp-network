@@ -47,11 +47,11 @@ TBD
 ### Register Package
 ```
 zeus register dapp-service-provider-package \
-    ipfservices myprovider package1 \
-    --key $ACTIVE_PRIVATE_KEY \
-    --min-stake-quantity 1.000 \
+    ipfs myprovider package1 \
+    --key 5JDZU7ZhZ2q8VtbwWzNr49mtx8B7Q29aRNhheDzUdPusRJki... \
+    --min-stake-quantity "1.0000" \
     --package-period 3600 \
-    --quota 0.100 \
+    --quota "0.1000" \
     --api-endpoint https://api.acme-dsp.com \
     --package-json-uri https://acme-dsp.com/dsp-package.json
 ```
