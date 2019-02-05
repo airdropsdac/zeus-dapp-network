@@ -39,6 +39,9 @@ module.exports = {
                 }).option('dappservices-contract', {
                         describe: 'dappservices contract account (only for testing)',
                         default: "dappservices"
+                }).option('network', {
+                        describe: 'network to work on',
+                        default: "development"
                 }).demandOption(['key','api-endpoint','package-json-uri']);
     },
     command: `${cmd} <service> <provider> <package-id>`,
