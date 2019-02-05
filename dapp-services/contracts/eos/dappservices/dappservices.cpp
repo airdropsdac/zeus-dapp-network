@@ -108,7 +108,7 @@ public:
       return _by_account_service(account, service);
     }
     static uint128_t _by_account_service(name account, name service) {
-      return ((uint128_t)account.value<<64)+service.value;
+      return ((uint128_t)account.value<<64) | service.value;
     }
     static key256 _by_account_service_provider(name account, name service,
                                                  name provider) {
@@ -390,7 +390,6 @@ public:
     require_recipient(provider);
     require_recipient(service);
     dist_rewards(to, provider, service);
-    auto seconds = 24 * 60 * 60;
     auto current_time_ms = current_time() / 1000;
     uint64_t unstake_time = current_time_ms + getUnstakeRemaining(to,provider,service);
     
@@ -415,12 +414,14 @@ public:
         r.service = service;
       });
     }
-
-    scheduleRefund(seconds, to, provider, service, quantity.symbol.code());
+    uint64_t secondsLeft = 
+        (unstake_time - current_time_ms) / 1000; // calc how much left
+    if(unstake_time < current_time_ms || secondsLeft == 0)
+      secondsLeft = 1;
+    scheduleRefund(secondsLeft, to, provider, service, quantity.symbol.code());
   }
 
   ACTION refund(name to, name provider, name service, symbol_code symcode) {
-    require_auth(to);
     require_recipient(provider);
     require_recipient(service);
     auto current_time_ms = current_time() / 1000;
@@ -433,15 +434,26 @@ public:
     dist_rewards(to, provider, service);
     uint64_t secondsLeft = 
         (req->unstake_time - current_time_ms) / 1000; // calc how much left
+    if(req->unstake_time < current_time_ms)
+      secondsLeft = 0;
     if (secondsLeft > 0) {
       scheduleRefund(secondsLeft, to, provider, service, symcode);
       return;
     }
 
     auto quantity = req->amount;
-    sub_provider_balance(to, service, provider, quantity);
-    sub_total_staked(quantity);
-    add_balance(to, quantity, to);
+    accountexts_t accountexts(_self, DAPPSERVICES_SYMBOL.code().raw());
+    auto idxKeyAcct =
+        accountext::_by_account_service_provider(to, service, provider);
+    auto cidxacct = accountexts.get_index<"byprov"_n>();
+    auto acct = cidxacct.find(idxKeyAcct);
+    if(acct != cidxacct.end()){
+      if(quantity > acct->balance)
+        quantity = acct->balance;
+      sub_provider_balance(to, service, provider, quantity);
+      sub_total_staked(quantity);
+      add_balance(to, quantity, to);
+    }
     cidx.erase(req);
   }
 
@@ -519,11 +531,14 @@ private:
 
   void sub_provider_balance(name owner, name service, name provider,
                             asset quantity) {
-    accountexts_t accountexts(_self, quantity.symbol.code().raw());
+    accountexts_t accountexts(_self, DAPPSERVICES_SYMBOL.code().raw());
     auto idxKey =
         accountext::_by_account_service_provider(owner, service, provider);
     auto cidx = accountexts.get_index<"byprov"_n>();
     auto acct = cidx.find(idxKey);
+    eosio_assert(acct != cidx.end(), "no balance object for provider");
+    eosio_assert(acct->balance >= quantity, "overdrawn balance");
+
     cidx.modify(acct, eosio::same_payer,
                 [&](auto &a) { a.balance -= quantity; });
   }
@@ -570,7 +585,7 @@ private:
 
     auto acct = cidx.find(idxKey);
     eosio_assert(acct != cidx.end(), "no quota for this provider");
-    eosio_assert(acct->quota >= quantity, "no enough quota for this provider");
+    eosio_assert(acct->quota >= quantity, "not enough quota for this provider");
     auto newQuantity = acct->quota;
     if(acct->quota < quantity){
         return false;
@@ -608,6 +623,7 @@ private:
         std::vector<permission_level>{{name(current_receiver()), "active"_n}},
         _self, "refund"_n, std::make_tuple(to, provider, service, symcode));
     trx.delay_sec = seconds;
+    cancel_deferred(to.value);
     trx.send(to.value, _self, true);
   }
   double applyInflation() {
@@ -692,7 +708,7 @@ private:
     acct.quota.amount = newpackage.quota.amount;
     acct.package = acct.pending_package;
     acct.package_end =
-        acct.package_started + (newpackage.package_period * 60 * 60 * 1000);
+        acct.package_started + (newpackage.package_period * 1000);
   }
   void dist_rewards(name payer, name provider, name service) {
 

@@ -37,8 +37,10 @@ const handleRequest = async(handler,act,packageid, serviceName, abi)=>{
             });
         }
         catch(e){
-            console.log("response error, could not call contract callback",e);
-            // todo: rethrow if not dup tx
+            if(e.toString().indexOf("duplicate") == -1){
+                console.log("response error, could not call contract callback",e);
+                throw e;
+            }
         }
     // dispatch on chain response - call response.action with params with paccount permissions
     }));
