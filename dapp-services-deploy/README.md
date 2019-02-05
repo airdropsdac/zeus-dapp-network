@@ -38,11 +38,73 @@ TBD
 
 ## Register
 
-### dsp-package.json
-TBD
+### dsp-package.json (draft)
+```
+{
+    "name": "Package 1",
+    "description": "Best for low vgrabs",
+    "dsp_json_uri": "https://acme-dsp.com/package1.dsp-package.json",
+    "logo":{
+      "logo_256":"https://....",
+      "logo_1024":"https://....",
+      "logo_svg":"https://...."
+    },
+    "service_level_agreement": {
+        "availability":{
+            "uptime_9s": 5
+        },
+        "performance":{
+            "95": 500,
+        },
+    },
+    "pinning":{
+        "ttl": 2400,
+        "public": false
+    },
+    "locations":[
+        {
+          "name": "Atlantis",
+          "country": "ATL",
+          "latitude": 2.082652,
+          "longitude": 1.781132
+        }
+    ]
+}
+```
+### dsp.json (draft)
+```
+{
+    "name": "acme DSP",
+    "website": "https://acme-dsp.com",
+    "code_of_conduct":"https://...",
+    "ownership_disclosure" : "https://...",
+    "email":"dsp@acme-dsp.com",
+    "branding":{
+      "logo_256":"https://....",
+      "logo_1024":"https://....",
+      "logo_svg":"https://...."
+    },
+    "location": {
+      "name": "Atlantis",
+      "country": "ATL",
+      "latitude": 2.082652,
+      "longitude": 1.781132
+    },
+    "social":{
+      "steemit": "",
+      "twitter": "",
+      "youtube": "",
+      "facebook": "",
+      "github":"",
+      "reddit": "",
+      "keybase": "",
+      "telegram": "",
+      "wechat":""      
+    }
+    
+}
 
-### dsp.json
-TBD
+```
 
 ### Register Package
 ```
@@ -53,7 +115,7 @@ zeus register dapp-service-provider-package \
     --package-period 3600 \
     --quota "0.1000" \
     --api-endpoint https://api.acme-dsp.com \
-    --package-json-uri https://acme-dsp.com/dsp-package.json
+    --package-json-uri https://acme-dsp.com/package1.dsp-package.json
 ```
 
 For more package options:
