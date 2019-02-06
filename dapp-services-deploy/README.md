@@ -8,7 +8,7 @@ state-history-endpoint = 0.0.0.0:8889
 trace-history = true
 contracts-console = true
 ```
-- IPFS Cluster
+- IPFS Cluster - https://github.com/ipfs/kubernetes-ipfs/tree/master/ipfs-cluster
 
 ## Create an EOS Account for your DSP
 ## Install & Run
