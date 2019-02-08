@@ -2,6 +2,7 @@ var path = require('path');
 var fs = require('fs');
 const {loadModels} = require("../../tools/models");
 const {emojMap} = require("../../helpers/_exec");
+const {dappServicesContract} = require("../../tools/eos/dapp-services");
 
 
 
@@ -259,7 +260,13 @@ const compileDappService = async(serviceModel)=>{
         throw new Error(emojMap.white_frowning_face+`CodeGen Service: ${name.green} Service: ${e}`);
     }
 };
-
+const generateConfig = async()=>{
+    fs.writeFileSync(path.resolve(`./contracts/eos/dappservices/dappservices.config.hpp`),
+    ```
+    #define DAPPSERVICES_CONTRACT "${dappServicesContract}"_n
+    ```);
+}
 module.exports = async (args)=>{
+    await generateConfig();
     await Promise.all((await loadModels('dapp-services')).map(compileDappService));
 }

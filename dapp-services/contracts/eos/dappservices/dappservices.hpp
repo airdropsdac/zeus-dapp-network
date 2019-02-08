@@ -6,7 +6,6 @@
 #include <eosiolib/dispatcher.hpp>
 #include <eosiolib/eosio.hpp>
 #include <eosiolib/name.hpp>
-
 #include "../Common/base/base64.hpp"
 #include "../Common/events.hpp"
 #include <boost/preprocessor/control/iif.hpp>
@@ -24,7 +23,9 @@ using eosio::permission_level;
 using std::string;
 using eosio::key256;
 using eosio::symbol_code;
-#define DAPPSERVICES_CONTRACT "dappservices"_n
+
+#include "dappservices.config.hpp"
+
 #define DAPPSERVICES_SYMBOL symbol(symbol_code("DAPP"), 4)
 #define DAPPSERVICES_QUOTA_SYMBOL symbol(symbol_code("QUOTA"), 4)
 #define EXPAND(...) __VA_ARGS__
