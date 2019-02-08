@@ -2,7 +2,7 @@ import 'mocha';
 const { getCreateKeys } = require('./utils');
 const {loadModels} = require("../models");
 
-const dappServicesContract = 'dappservices';
+const dappServicesContract = process.env.DAPPSERVICES_CONTRACT || 'dappservices';
 
 async function genAllocateDAPPTokens(deployedContract,serviceName,provider="pprovider1",selectedPackage="default") {
     var key = await getCreateKeys(dappServicesContract);
