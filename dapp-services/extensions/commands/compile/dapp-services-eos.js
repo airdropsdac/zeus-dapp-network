@@ -262,11 +262,9 @@ const compileDappService = async(serviceModel)=>{
 };
 const generateConfig = async()=>{
     fs.writeFileSync(path.resolve(`./contracts/eos/dappservices/dappservices.config.hpp`),
-    ```
-    #define DAPPSERVICES_CONTRACT "${dappServicesContract}"_n
-    ```);
+    `#define DAPPSERVICES_CONTRACT "${dappServicesContract}"_n\n`);
 }
 module.exports = async (args)=>{
-    await generateConfig();
     await Promise.all((await loadModels('dapp-services')).map(compileDappService));
+    await generateConfig();
 }
