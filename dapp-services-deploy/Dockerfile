@@ -10,4 +10,4 @@ ENV NODEOS_HOST=localhost
 ENV NODEOS_CHAINID=XXXXXXXXX
 
 
-ENTRYPOINT ["zeus","start-localenv"]
+ENTRYPOINT ["zeus","start-localenv", "--creator","prod"]
