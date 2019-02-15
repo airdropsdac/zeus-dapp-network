@@ -4,7 +4,7 @@
     "zeus-box.json"
   ],
   "commands": {
-    "Deploy DSP": "cat README.md"
+    "Register DSP": "zeus register dapp-service-provider-package --help"
   },
   "dependencies":[
     "coldtoken"
