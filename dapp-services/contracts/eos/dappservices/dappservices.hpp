@@ -194,11 +194,11 @@ struct usage_t {
 #define EOSIO_DISPATCH_SVC_TRX(contract, methods)    \
   extern "C" {                                                                 \
   [[noreturn]] void apply(uint64_t receiver, uint64_t code, uint64_t action) { \
-    if (action == "transfer"_n.value) {                                        \
+    if (code != receiver && action == "transfer"_n.value) {                    \
       eosio::execute_action(eosio::name(receiver), eosio::name(code),          \
                             &contract::transfer);                              \
     }                                                                          \
-    if (code == receiver) {                                                    \
+    else {                                                    \
       switch (action) {                                                        \
         BUILD_ACTIONS_SVC_HELPER(contract, DAPPSERVICE_ACTIONS_COMMANDS())           \
         EOSIO_DISPATCH_HELPER(contract, methods)                               \
