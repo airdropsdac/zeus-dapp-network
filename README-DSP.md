@@ -1,8 +1,8 @@
-# Deploying and registering a DSP
+# Deploy and Register a DSP
 
 ## Create an EOS Account for your DSP
 
-## Deploy
+## Deploy a full cluster using kubernetes
 
 - DSP Cluster - https://github.com/liquidapps-io/dapp-dsp-k8s-helm/blob/master/README.md
 
