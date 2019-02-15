@@ -1,7 +1,5 @@
 # Deploy and Register a DSP
 
-## Create an EOS Account for your DSP
-
 ## Deploy a full cluster using kubernetes
 
 - DSP Cluster - https://github.com/liquidapps-io/dapp-dsp-k8s-helm/blob/master/README.md
@@ -9,7 +7,7 @@
 ## Register
 
 ### Prepare and host dsp.json 
-```
+```JSON
 {
     "name": "acme DSP",
     "website": "https://acme-dsp.com",
@@ -45,7 +43,7 @@
 ### Prepare and host dsp-package.json 
 
 
-```
+```JSON
 {
     "name": "Package 1",
     "description": "Best for low vgrabs",
@@ -82,13 +80,13 @@
 https://github.com/liquidapps-io/zeus-cmd
 
 ### Unbox registration package
-```
+```bash
 zeus unbox dapp-services-deploy
 cd dapp-services-deploy
 ```
 
 ### Register Package
-```
+```bash
 zeus register dapp-service-provider-package \
     ipfs myprovider package1 \
     --key 5JDZU7ZhZ2q8VtbwWzNr49mtx8B7Q29aRNhheDzUdPusRJki... \
@@ -100,6 +98,6 @@ zeus register dapp-service-provider-package \
 ```
 
 For more package options:
-```
+```bash
 zeus register dapp-service-provider-package --help 
 ```
