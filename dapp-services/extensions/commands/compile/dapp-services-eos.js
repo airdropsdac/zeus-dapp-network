@@ -1,25 +1,25 @@
 var path = require('path');
 var fs = require('fs');
-const {loadModels} = require("../../tools/models");
-const {emojMap} = require("../../helpers/_exec");
-const {dappServicesContract} = require("../../tools/eos/dapp-services");
+const { loadModels } = require("../../tools/models");
+const { emojMap } = require("../../helpers/_exec");
+const { dappServicesContract, getContractAccountFor } = require("../../tools/eos/dapp-services");
 
 
 
-const CMAKELISTS_FILE =`
+const CMAKELISTS_FILE = `
 get_filename_component(PROJ_NAME "\${CMAKE_CURRENT_SOURCE_DIR}" NAME )
 cmake_minimum_required(VERSION 3.5)
 project(\${PROJ_NAME} VERSION 1.0.0)
 find_package(eosio.cdt)
 add_executable( \${PROJ_NAME}.wasm \${ARGN} \${PROJ_NAME} \${PROJ_NAME}.cpp )
 `
-		
 
-const generateServiceCppFile = (serviceModel)=>{
-    var name = serviceModel.name; 
+
+const generateServiceCppFile = (serviceModel) => {
+    var name = serviceModel.name;
     var commandNames = Object.keys(serviceModel.commands);
-    var M = (macro)=>commandNames.map(commandName=>`${macro}(${commandName})`).join('\n');
-    var upperName = name.toUpperCase(); 
+    var M = (macro) => commandNames.map(commandName => `${macro}(${commandName})`).join('\n');
+    var upperName = name.toUpperCase();
 
     return `#define SVC_NAME ${name}
 #include "../dappservices/${name}.hpp"
@@ -58,22 +58,19 @@ EOSIO_DISPATCH_SVC_PROVIDER(${name}service)\n`;
 
 }
 
-const generateServiceAbiFile = (serviceModel)=>{
+const generateServiceAbiFile = (serviceModel) => {
     const abi = {
         "____comment": "This file was generated with dapp-services-eos. DO NOT EDIT " + new Date().toUTCString(),
         "version": "eosio::abi/1.0",
-        "structs": [
-            {
+        "structs": [{
                 "name": "model_t",
                 "base": "",
-                "fields": [
-                ]
+                "fields": []
             },
             {
                 "name": "providermdl",
                 "base": "",
-                "fields": [
-                    {
+                "fields": [{
                         "name": "model",
                         "type": "model_t"
                     },
@@ -86,8 +83,7 @@ const generateServiceAbiFile = (serviceModel)=>{
             {
                 "name": "xsignal",
                 "base": "",
-                "fields": [
-                    {
+                "fields": [{
                         "name": "service",
                         "type": "name"
                     },
@@ -112,8 +108,7 @@ const generateServiceAbiFile = (serviceModel)=>{
             {
                 "name": "regprovider",
                 "base": "",
-                "fields": [
-                    {
+                "fields": [{
                         "name": "provider",
                         "type": "name"
                     },
@@ -125,8 +120,7 @@ const generateServiceAbiFile = (serviceModel)=>{
             }
         ],
         "types": [],
-        "actions": [
-            {
+        "actions": [{
                 "name": "xsignal",
                 "type": "xsignal",
                 "ricardian_contract": ""
@@ -137,74 +131,71 @@ const generateServiceAbiFile = (serviceModel)=>{
                 "ricardian_contract": ""
             }
         ],
-        "tables": [
-            {
-                "name": "providermdl",
-                "type": "providermdl",
-                "index_type": "i64",
-                "key_names": [],
-                "key_types": []
-            }
-        ],
+        "tables": [{
+            "name": "providermdl",
+            "type": "providermdl",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        }],
         "ricardian_clauses": [],
         "abi_extensions": []
     };
     const structs = abi.structs;
-    const model_fields = structs.find(a=>a.name == "model_t").fields;
-    function addCmd(cmdName){
+    const model_fields = structs.find(a => a.name == "model_t").fields;
+
+    function addCmd(cmdName) {
         structs.push({
-                "name": `${cmdName}_model_t`,
-                "base": "",
-                "fields": [
-                    {
-                        "name": "cost_per_action",
-                        "type": "uint64"
-                    }
-                ]
-            });
+            "name": `${cmdName}_model_t`,
+            "base": "",
+            "fields": [{
+                "name": "cost_per_action",
+                "type": "uint64"
+            }]
+        });
         model_fields.push({
-                            "name": `${cmdName}_model_field`,
-                            "type": `${cmdName}_model_t`
-                        });
+            "name": `${cmdName}_model_field`,
+            "type": `${cmdName}_model_t`
+        });
     }
     Object.keys(serviceModel.commands).forEach(addCmd);
-    return JSON.stringify(abi,null,2);
+    return JSON.stringify(abi, null, 2);
 }
 
-const generateCommandCodeText = (serviceName, commandName, commandModel, serviceContract) =>{
-    
-  var fnArgs = (args) => Object.keys(args).map(name=>`((${args[name]})(${name}))`).join('');
-  var fnPassArgs = (args) => Object.keys(args).join(', ');
+const generateCommandCodeText = (serviceName, commandName, commandModel, serviceContract) => {
 
-  return `SVC_ACTION(${commandName}, ${commandModel.blocking}, ${fnArgs(commandModel.request)},     \
+    var fnArgs = (args) => Object.keys(args).map(name => `((${args[name]})(${name}))`).join('');
+    var fnPassArgs = (args) => Object.keys(args).join(', ');
+
+    return `SVC_ACTION(${commandName}, ${commandModel.blocking}, ${fnArgs(commandModel.request)},     \
          ${fnArgs(commandModel.signal)}, \
          ${fnArgs(commandModel.callback)},"${serviceContract}"_n) { \
     _${serviceName}_${commandName}(${fnPassArgs(commandModel.callback)}); \
     SEND_SVC_SIGNAL(${commandName}, current_provider, package, ${fnPassArgs(commandModel.signal)})                         \
-};`                                                                            
+};`
 
 };
 
-const generateCommandHelperCodeText = (serviceName, commandName, commandModel)=>{
-  var rargs = commandModel.request;
-  var argsKeys = Object.keys(rargs);
-  var fnArgsWithType = argsKeys.map(name=>`${rargs[name]} ${name}`).join(', ');
-  var fnArgs = argsKeys.join(', ');
-  return `static void svc_${serviceName}_${commandName}(${fnArgsWithType}) { \
+const generateCommandHelperCodeText = (serviceName, commandName, commandModel) => {
+    var rargs = commandModel.request;
+    var argsKeys = Object.keys(rargs);
+    var fnArgsWithType = argsKeys.map(name => `${rargs[name]} ${name}`).join(', ');
+    var fnArgs = argsKeys.join(', ');
+    return `static void svc_${serviceName}_${commandName}(${fnArgsWithType}) { \
     SEND_SVC_REQUEST(${commandName}, ${fnArgs}) \
 };`
 }
-const generateServiceHppFile = (serviceModel)=>{
-    var name = serviceModel.name; 
-    var upperName = name.toUpperCase(); 
+const generateServiceHppFile = (serviceModel) => {
+    var name = serviceModel.name;
+    var upperName = name.toUpperCase();
     var commandNames = Object.keys(serviceModel.commands);
     var commandsCodeText = commandNames.map(
-        commandName=> generateCommandCodeText(name,commandName,
-            serviceModel.commands[commandName], serviceModel.contract)).join('\\\n');
+        commandName => generateCommandCodeText(name, commandName,
+            serviceModel.commands[commandName], getContractAccountFor(serviceModel))).join('\\\n');
     var commandsHelpersCodeText = commandNames.map(
-        commandName=> generateCommandHelperCodeText(name,commandName,
-            serviceModel.commands[commandName], serviceModel.contract)).join('\\\n');        
-        
+        commandName => generateCommandHelperCodeText(name, commandName,
+            serviceModel.commands[commandName], getContractAccountFor(serviceModel))).join('\\\n');
+
     return `#pragma once
 #include "../dappservices/dappservices.hpp"\n
 #define SVC_RESP_${upperName}(name) \\
@@ -238,33 +229,33 @@ struct ${name}_svc_helper{
 
 }
 
-const compileDappService = async(serviceModel)=>{
+const compileDappService = async(serviceModel) => {
     var name = serviceModel.name;
     var targetFolder = path.resolve(`./contracts/eos/${name}service`);
-    if (!fs.existsSync( targetFolder ) ) 
+    if (!fs.existsSync(targetFolder))
         fs.mkdirSync(targetFolder);
-    try{
-    // generate files
-    fs.writeFileSync(path.resolve(`./contracts/eos/${name}service/${name}service.cpp`),
-        await generateServiceCppFile(serviceModel));
-    fs.writeFileSync(path.resolve(`./contracts/eos/${name}service/${name}service.abi`),
-        await generateServiceAbiFile(serviceModel));
-    fs.writeFileSync(path.resolve(`./contracts/eos/${name}service/CMakeLists.txt`),
-        CMAKELISTS_FILE);
-    
-    fs.writeFileSync(path.resolve(`./contracts/eos/dappservices/${name}.hpp`),
-        await generateServiceHppFile(serviceModel));
-        console.log(emojMap.alembic +`CodeGen Service ${name.green}`)
+    try {
+        // generate files
+        fs.writeFileSync(path.resolve(`./contracts/eos/${name}service/${name}service.cpp`),
+            await generateServiceCppFile(serviceModel));
+        fs.writeFileSync(path.resolve(`./contracts/eos/${name}service/${name}service.abi`),
+            await generateServiceAbiFile(serviceModel));
+        fs.writeFileSync(path.resolve(`./contracts/eos/${name}service/CMakeLists.txt`),
+            CMAKELISTS_FILE);
+
+        fs.writeFileSync(path.resolve(`./contracts/eos/dappservices/${name}.hpp`),
+            await generateServiceHppFile(serviceModel));
+        console.log(emojMap.alembic + `CodeGen Service ${name.green}`)
     }
-    catch(e){
-        throw new Error(emojMap.white_frowning_face+`CodeGen Service: ${name.green} Service: ${e}`);
+    catch (e) {
+        throw new Error(emojMap.white_frowning_face + `CodeGen Service: ${name.green} Service: ${e}`);
     }
 };
-const generateConfig = async()=>{
+const generateConfig = async() => {
     fs.writeFileSync(path.resolve(`./contracts/eos/dappservices/dappservices.config.hpp`),
-    `#define DAPPSERVICES_CONTRACT "${dappServicesContract}"_n\n`);
+        `#define DAPPSERVICES_CONTRACT "${dappServicesContract}"_n\n`);
 }
-module.exports = async (args)=>{
+module.exports = async(args) => {
     await Promise.all((await loadModels('dapp-services')).map(compileDappService));
     await generateConfig();
 }

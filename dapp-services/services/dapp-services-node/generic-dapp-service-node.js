@@ -7,6 +7,8 @@ if (process.env.DAEMONIZE_PROCESS)
 
 const { loadModels } = require("../../extensions/tools/models")
 const { getCreateKeys } = require('../../extensions/tools/eos/utils');
+const { getContractAccountFor } = require("../../extensions/tools/eos/dapp-services")
+
 const { deserialize, generateABI, genNode, eosPrivate, paccount, forwardEvent, resolveProviderData, resolveProvider, resolveProviderPackage } = require('./common');
 const handleRequest = async(handler, act, packageid, serviceName, abi) => {
     let { service, payer, provider, action, data } = act.event;
@@ -55,7 +57,7 @@ const actionHandlers = {
         provider = await resolveProvider(payer, service, provider);
         var packageid = await resolveProviderPackage(payer, service, provider);
         if (!simulated) {
-            if (!(model.contract == service && handler))
+            if (!(getContractAccountFor(model) == service && handler))
                 return;
             await handleRequest(handler, act, packageid, serviceName, handlers.abi);
             return;
@@ -63,7 +65,7 @@ const actionHandlers = {
         if (!act.exception)
             return;
 
-        if (model.contract == service && handler) {
+        if (getContractAccountFor(model) == service && handler) {
             await handleRequest(handler, act, packageid, serviceName, handlers.abi);
             return "retry";
         }

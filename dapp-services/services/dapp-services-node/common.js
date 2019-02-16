@@ -1,16 +1,15 @@
 const paccount = process.env.DSP_ACCOUNT || process.env.PROOF_PROVIDER_ACCOUNT || "pprovider1";
 const fetch = require('node-fetch');
-const {dappServicesContract} = require("../../extensions/tools/eos/dapp-services")
-const {loadModels} = require("../../extensions/tools/models");
-const Eos  = require('eosjs');
+const { dappServicesContract, getContractAccountFor } = require("../../extensions/tools/eos/dapp-services")
+const { loadModels } = require("../../extensions/tools/models");
+const Eos = require('eosjs');
 const bodyParser = require('body-parser');
 const express = require('express');
 const cors = require('cors');
 const httpProxy = require('http-proxy');
 import BigNumber from 'bignumber.js';
 
-const networks = [
-    {
+const networks = [{
         name: "Main Net",
         host: "node2.liquideos.com",
         port: 80,
@@ -50,30 +49,30 @@ else {
 const nodeosEndpoint = eosconfig.httpEndpoint;
 const proxy = httpProxy.createProxyServer();
 var eosPrivate = new Eos(eosconfig);
-const forwardEvent = async(act, endpoint, redirect)=>{
-    if(redirect)
+const forwardEvent = async(act, endpoint, redirect) => {
+    if (redirect)
         return endpoint;
-    
-    const r = await fetch(endpoint + "/event",{ method: 'POST', body: JSON.stringify(act) });
+
+    const r = await fetch(endpoint + "/event", { method: 'POST', body: JSON.stringify(act) });
     await r.text();
-    
+
     return;
 }
 
-const resolveBackendServiceData = async (service, provider)=>{
+const resolveBackendServiceData = async(service, provider) => {
     // console.log('resolving backend service for', service, provider);
     // read from local service models
     var loadedExtensions = await loadModels("dapp-services");
-    var loadedExtension = loadedExtensions.find(a=>a.contract == service);
-    if(!loadedExtension)
+    var loadedExtension = loadedExtensions.find(a => getContractAccountFor(a) == service);
+    if (!loadedExtension)
         return;
-    
+
     return {
         internal: true,
-        endpoint:"http://localhost:" + loadedExtension.port
+        endpoint: "http://localhost:" + loadedExtension.port
     }
 }
-const resolveExternalProviderData = async (service, provider)=>{
+const resolveExternalProviderData = async(service, provider) => {
     // read from table at service (providermodel)
     var res = await eosPrivate.getTableRows({
         "json": true,
@@ -82,7 +81,7 @@ const resolveExternalProviderData = async (service, provider)=>{
         "table": "providermodel",
         "limit": 1
     });
-    if(!res.rows.length)
+    if (!res.rows.length)
         return;
     var data = res.rows[0];
     return {
@@ -92,12 +91,12 @@ const resolveExternalProviderData = async (service, provider)=>{
 }
 
 
-const resolveProviderData = async (service, provider)=>
-    ((paccount == provider) ? resolveBackendServiceData : resolveExternalProviderData) (service, provider);
+const resolveProviderData = async(service, provider) =>
+    ((paccount == provider) ? resolveBackendServiceData : resolveExternalProviderData)(service, provider);
 
 const toBound = (numStr) =>
-   `0x${(new Array(33).join('0') + numStr).substring(numStr.length).toUpperCase()}`;
-const resolveProviderPackage = async (payer, service, provider)=>{
+    `0x${(new Array(33).join('0') + numStr).substring(numStr.length).toUpperCase()}`;
+const resolveProviderPackage = async(payer, service, provider) => {
     var encodedPayer = new BigNumber(Eos.modules.format.encodeName(payer, false));
     var encodedService = new BigNumber(Eos.modules.format.encodeName(service, false));
     var key = shiftLeft(encodedPayer, 64).plus(encodedService);
@@ -115,24 +114,24 @@ const resolveProviderPackage = async (payer, service, provider)=>{
     });
 
     // console.log("found",serviceWithStakingResult.rows);
-    var serviceWithStaking = serviceWithStakingResult.rows.filter(a=>a.provider == provider);
+    var serviceWithStaking = serviceWithStakingResult.rows.filter(a => a.provider == provider);
     var pkg = serviceWithStaking[0].package;
-    if(pkg == "")
+    if (pkg == "")
         pkg = serviceWithStaking[0].pending_package;
     return pkg;
 }
 
-var shiftLeft = function (bignum, n) {
+var shiftLeft = function(bignum, n) {
     n = +n.toString();
     var b = bignum.abs().integerValue(BigNumber.ROUND_FLOOR).toString(2);
     b += '0'.repeat(n);
-    if ( bignum.isNegative() ) b = '-' + b;
-    return new BigNumber( b, 2 );
+    if (bignum.isNegative()) b = '-' + b;
+    return new BigNumber(b, 2);
 };
 
 
-const resolveProvider = async (payer, service, provider)=>{
-    if(provider != "")
+const resolveProvider = async(payer, service, provider) => {
+    if (provider != "")
         return provider;
     return paccount;
     console.log(`resolving provider for payer:${payer} service:${service} ${provider == "" ? '' : 'provider:'}${provider}`);
@@ -167,195 +166,193 @@ const resolveProvider = async (payer, service, provider)=>{
     // var loadedInExtensions = loadedInExtensionResult.rows.map(a=>a.provider);
     var serviceWithStaking = serviceWithStakingResult.rows;
     // prefer self
-    var intersectLists = serviceWithStaking.filter(accountProvider=>accountProvider.model !== "").map(a=>a.provider);
-    if(intersectLists.indexOf(paccount) !== -1)
+    var intersectLists = serviceWithStaking.filter(accountProvider => accountProvider.model !== "").map(a => a.provider);
+    if (intersectLists.indexOf(paccount) !== -1)
         return paccount;
-    
-    return intersectLists[Math.floor(Math.random()*intersectLists.length)];
+
+    return intersectLists[Math.floor(Math.random() * intersectLists.length)];
 }
 
-const processFn = async (actionHandlers, actionObject, simulated, serviceName, handlers) =>{
+const processFn = async(actionHandlers, actionObject, simulated, serviceName, handlers) => {
     var actionHandler = actionHandlers[actionObject.event.etype];
-    if(!actionHandler)
+    if (!actionHandler)
         return;
-    try{
+    try {
         return await actionHandler(actionObject, simulated, serviceName, handlers);
     }
-    catch(e)
-    {
+    catch (e) {
         console.error(e);
         throw e;
     }
 }
 
-async function parsedAction(actionHandlers, account,method,code,actData, events, simulated, serviceName, handlers){
+async function parsedAction(actionHandlers, account, method, code, actData, events, simulated, serviceName, handlers) {
     for (var i = 0; i < events.length; i++) {
         var event = events[i];
-        var actionObject =  {
+        var actionObject = {
             receiver: account,
             method,
             account: code,
-            data: actData, 
+            data: actData,
             event
         }
         await processFn(actionHandlers, actionObject, simulated, serviceName, handlers);
     }
 }
 
-async function parseEvents(text){
-    return text.split('\n').map(a=>{
-        if(a === "")
+async function parseEvents(text) {
+    return text.split('\n').map(a => {
+        if (a === "")
             return null;
-        try{
+        try {
             return JSON.parse(a);
         }
-        catch(e){
-        }
-    }).filter(a=>a);
+        catch (e) {}
+    }).filter(a => a);
 }
 
-const handleAction = async (actionHandlers,action, simulated, serviceName, handlers)=>{
+const handleAction = async(actionHandlers, action, simulated, serviceName, handlers) => {
     var res = [];
 
     var events = await parseEvents(action.console);
-    await parsedAction(actionHandlers,action.receiver,action.act.name,action.act.account, action.act.data, events, simulated, serviceName, handlers);
-    res = [...res,...events];
+    await parsedAction(actionHandlers, action.receiver, action.act.name, action.act.account, action.act.data, events, simulated, serviceName, handlers);
+    res = [...res, ...events];
     for (var i = 0; i < action.inline_traces.length; i++) {
-        var subevents = await handleAction(actionHandlers,action.inline_traces[i], simulated,serviceName, handlers);
-        res = [...res,...subevents];
+        var subevents = await handleAction(actionHandlers, action.inline_traces[i], simulated, serviceName, handlers);
+        res = [...res, ...subevents];
     }
     return res;
 };
 var getRawBody = require('raw-body');
-const genNode = async (actionHandlers, port, serviceName, handlers, abi)=>{
-    if(handlers)
+const genNode = async(actionHandlers, port, serviceName, handlers, abi) => {
+    if (handlers)
         handlers.abi = abi;
     const app = genApp();
-    app.use(async (req,res,next)=>{
+    app.use(async(req, res, next) => {
         var uri = req.originalUrl;
         var isServiceRequest = uri.indexOf('/event') == 0;
-        if(uri != '/v1/chain/push_transaction' && !isServiceRequest){
+        if (uri != '/v1/chain/push_transaction' && !isServiceRequest) {
             proxy.web(req, res, { target: nodeosEndpoint });
             return;
         }
-        
+
         getRawBody(req, {
             length: req.headers['content-length'],
-        }, async function (err, string) {
-         if (err) return next(err)
-         var body = JSON.parse(string.toString());
+        }, async function(err, string) {
+            if (err) return next(err)
+            var body = JSON.parse(string.toString());
 
-        if(isServiceRequest){
-            try{
-                await processFn(actionHandlers, body, false, serviceName, handlers);
-                res.send(JSON.stringify("ok"));
+            if (isServiceRequest) {
+                try {
+                    await processFn(actionHandlers, body, false, serviceName, handlers);
+                    res.send(JSON.stringify("ok"));
+                }
+                catch (e) {
+                    res.status(500);
+                    res.send(JSON.stringify({
+                        code: 500,
+                        error: {
+                            details: [{ message: e.toString() }]
+                        }
+                    }));
+                }
+                return;
             }
-            catch(e){
-                res.status(500);
-                res.send(JSON.stringify({
-                  code:500,
-                  error:{
-                      details: [{message:e.toString()}]
-                  }
-                }));
-            }
-            return;
-        }
-        while(true){
-            var r = await fetch(nodeosEndpoint + uri,{ method: 'POST', body: JSON.stringify(body) });
-            var resText = await r.text();
-            try{
-                var rText = JSON.parse(resText);
-                if(r.status == 500){
-                    
-                    var details = rText.error.details;
-                    var detailMsg = details.find(d=>d.message.indexOf(": required service") != -1);
-                    if(detailMsg){
-                        
-                        var jsons = details[details.indexOf(detailMsg)+1].message.split(': ',2)[1].split('\n').filter(a=>a.trim() != '');
-                        var currentEvent;
-                        for (var i = 0; i < jsons.length; i++) {
-                            
-                            try{
-                                currentEvent = JSON.parse(jsons[i]);
+            while (true) {
+                var r = await fetch(nodeosEndpoint + uri, { method: 'POST', body: JSON.stringify(body) });
+                var resText = await r.text();
+                try {
+                    var rText = JSON.parse(resText);
+                    if (r.status == 500) {
+
+                        var details = rText.error.details;
+                        var detailMsg = details.find(d => d.message.indexOf(": required service") != -1);
+                        if (detailMsg) {
+
+                            var jsons = details[details.indexOf(detailMsg) + 1].message.split(': ', 2)[1].split('\n').filter(a => a.trim() != '');
+                            var currentEvent;
+                            for (var i = 0; i < jsons.length; i++) {
+
+                                try {
+                                    currentEvent = JSON.parse(jsons[i]);
+                                }
+                                catch (e) {
+                                    continue;
+                                }
+                                var currentActionObject = {
+                                    event: currentEvent,
+                                    exception: true
+                                }
+                                if (i < jsons.length - 1)
+                                    await processFn(actionHandlers, currentActionObject, true, serviceName, handlers);
                             }
-                            catch(e){
-                                continue;
-                            }
-                            var currentActionObject =  {
-                                event:currentEvent,
+                            var event = currentEvent;
+                            var actionObject = {
+                                event,
                                 exception: true
                             }
-                            if(i < jsons.length-1)
-                                await processFn(actionHandlers, currentActionObject, true, serviceName, handlers);
+                            var endpoint = await processFn(actionHandlers, actionObject, true, serviceName, handlers);
+                            if (endpoint === 'retry') {
+                                console.log("retrying")
+                                continue;
+                            }
+                            else if (endpoint) {
+                                r = await fetch(endpoint + uri, { method: 'POST', body: JSON.stringify(body) });
+                                resText = await r.text();
+                                rText = JSON.parse(resText);
+                            }
+                            res.status(r.status);
+                            res.send(JSON.stringify(rText));
+                            return;
                         }
-                        var event = currentEvent;
-                        var actionObject =  {
-                            event,
-                            exception: true
-                        }
-                        var endpoint = await processFn(actionHandlers, actionObject, true, serviceName, handlers);
-                        if(endpoint === 'retry'){
-                            console.log("retrying")
-                            continue;
-                        }
-                        else if(endpoint){
-                            r = await fetch(endpoint + uri,{ method: 'POST', body:JSON.stringify(body) });
-                            resText = await r.text();
-                            rText = JSON.parse(resText);
-                        }
-                        res.status(r.status);
-                        res.send(JSON.stringify(rText));            
-                        return;
                     }
-                }
-                else{
-                    for (var i = 0; i < rText.processed.action_traces.length; i++) {
-                        var action = rText.processed.action_traces[i];
-                        // skip actions that were already done previously (in exception)
-                        await handleAction(actionHandlers, action, true, serviceName, handlers);
+                    else {
+                        for (var i = 0; i < rText.processed.action_traces.length; i++) {
+                            var action = rText.processed.action_traces[i];
+                            // skip actions that were already done previously (in exception)
+                            await handleAction(actionHandlers, action, true, serviceName, handlers);
+                        }
                     }
+                    res.status(r.status);
+                    res.send(JSON.stringify(rText));
                 }
-                res.status(r.status);
-                res.send(JSON.stringify(rText));
+                catch (e) {
+                    console.error(e);
+                    res.status(500);
+                    res.send(JSON.stringify({
+                        code: 500,
+                        error: {
+                            details: [{ message: e.toString() }]
+                        }
+                    }));
+                }
+                return;
             }
-            catch(e){
-                console.error(e);
-                res.status(500);
-                res.send(JSON.stringify({
-                  code:500,
-                  error:{
-                      details: [{message:e.toString()}]
-                  }
-                }));
-            }
-            return;
-        }
-      });
-    
+        });
+
     });
     app.listen(port, () => console.log(`${serviceName} listening on port ${port}!`))
     return app;
 }
-const genApp = ()=>{
+const genApp = () => {
     const app = express();
     app.use(cors());
     app.use(bodyParser.json());
     return app;
 }
-const {Serialize} = require('../demux/eosjs2');
+const { Serialize } = require('../demux/eosjs2');
 const { TextDecoder, TextEncoder } = require('text-encoding');
 const fullabi = (abi) => {
-                return {
-                  "version": "eosio::abi/1.0",
-                    "structs":abi
-                };
-            };
+    return {
+        "version": "eosio::abi/1.0",
+        "structs": abi
+    };
+};
 
-const deserialize = (abi, data, atype)=>{
-    if(!abi)
+const deserialize = (abi, data, atype) => {
+    if (!abi)
         return;
-    
+
     var localTypes = Serialize.getTypesFromAbi(Serialize.createInitialTypes(), fullabi(abi));
     var buf1 = Buffer.from(data, "base64");
     var buffer = new Serialize.SerialBuffer({
@@ -364,53 +361,55 @@ const deserialize = (abi, data, atype)=>{
     });
     buffer.pushArray(Serialize.hexToUint8Array(buf1.toString('hex')));
     var theType = localTypes.get(atype);
-    if(!theType){
+    if (!theType) {
         // console.log('type not found', atype);
         return;
     }
-    return theType.deserialize(buffer); 
+    return theType.deserialize(buffer);
 }
 
 
 var typesDict = {
-    "uint8_t":"uint8",
-    "uint16_t":"uint16",
-    "uint32_t":"uint32",
-    "uint64_t":"uint64",
-    "int8_t":"int8",
-    "int16_t":"int16",
-    "int32_t":"int32",
-    "int64_t":"int64",
-    "name":"name",
-    "eosio::name":"name",
-    "asset":"asset",
-    "eosio::asset":"asset",
-    "std::string":"string",
-    "std::vector<char>":"bytes",
-    "vector<char>":"bytes",
-    "symbol_code":"symbol_code",
-    "eosio::symbol_code":"symbol_code"
+    "uint8_t": "uint8",
+    "uint16_t": "uint16",
+    "uint32_t": "uint32",
+    "uint64_t": "uint64",
+    "int8_t": "int8",
+    "int16_t": "int16",
+    "int32_t": "int32",
+    "int64_t": "int64",
+    "name": "name",
+    "eosio::name": "name",
+    "asset": "asset",
+    "eosio::asset": "asset",
+    "std::string": "string",
+    "std::vector<char>": "bytes",
+    "vector<char>": "bytes",
+    "symbol_code": "symbol_code",
+    "eosio::symbol_code": "symbol_code"
 }
-const convertToAbiType = (aType)=>{
-    if(!typesDict[aType])
+const convertToAbiType = (aType) => {
+    if (!typesDict[aType])
         throw new Error('unrecognized type', aType);
     return typesDict[aType];
 }
-const generateCommandABI = (commandName, commandModel)=>{
+const generateCommandABI = (commandName, commandModel) => {
     return {
-                "name": commandName,
-                "base": "",
-                "fields": Object.keys(commandModel.request).map(argName => {return {
-                        name: argName,
-                        type: convertToAbiType(commandModel.request[argName])
-                    };})
-            }
+        "name": commandName,
+        "base": "",
+        "fields": Object.keys(commandModel.request).map(argName => {
+            return {
+                name: argName,
+                type: convertToAbiType(commandModel.request[argName])
+            };
+        })
+    }
 }
 
-const generateABI = 
-    (serviceModel)=>
-        Object.keys(serviceModel.commands).map(c=>generateCommandABI(c,serviceModel.commands[c]))
+const generateABI =
+    (serviceModel) =>
+    Object.keys(serviceModel.commands).map(c => generateCommandABI(c, serviceModel.commands[c]))
 
 
 
-module.exports = {deserialize, generateABI, genNode, genApp, forwardEvent, resolveProviderData, resolveProvider, processFn, handleAction, paccount, proxy, eosPrivate, eosconfig, nodeosEndpoint, resolveProviderPackage}
+module.exports = { deserialize, generateABI, genNode, genApp, forwardEvent, resolveProviderData, resolveProvider, processFn, handleAction, paccount, proxy, eosPrivate, eosconfig, nodeosEndpoint, resolveProviderPackage }
