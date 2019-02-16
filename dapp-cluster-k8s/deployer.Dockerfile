@@ -19,3 +19,4 @@ RUN helm init -c
 WORKDIR /
 RUN zeus unbox dapp-cluster-k8s
 WORKDIR /dapp-cluster-k8s
+CMD [ "/bin/bash" ]
