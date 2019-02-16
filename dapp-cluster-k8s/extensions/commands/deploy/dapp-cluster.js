@@ -39,7 +39,7 @@ module.exports = {
             `--set dspnode.dspaccount=${args['key']}`
         ];
         try {
-            await execPromise(`helm install ${helmargs.join(' ')} . --name ${args['cluster-name']}`, { pwd: path.resolve('./dapp-dsp-k8s-helm') });
+            await execPromise(`helm install ${helmargs.join(' ')} . --name ${args['cluster-name']}`, { cwd: path.resolve('./dapp-dsp-k8s-helm') });
         }
         catch (e) {
             console.log(emojMap.white_frowning_face + "failed", e);
