@@ -1,4 +1,5 @@
 const { emojMap, execPromise } = require("../../helpers/_exec");
+var path = require('path');
 
 var cmd = 'dapp-cluster';
 module.exports = {
@@ -38,7 +39,7 @@ module.exports = {
             `--set dspnode.dspaccount=${args['key']}`
         ];
         try {
-            await execPromise(`helm install ${helmargs.join(' ')} . --name ${args['cluster-name']}`);
+            await execPromise(`helm install ${helmargs.join(' ')} . --name ${args['cluster-name']}`, { pwd: path.resolve('./dapp-dsp-k8s-helm') });
         }
         catch (e) {
             console.log(emojMap.white_frowning_face + "failed", e);
