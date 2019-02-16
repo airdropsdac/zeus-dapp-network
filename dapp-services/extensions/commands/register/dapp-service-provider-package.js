@@ -1,3 +1,4 @@
+const { emojMap, execPromise } = require("../../helpers/_exec");
 var { loadModels } = require('../../tools/models');
 var { getEos } = require('../../tools/eos/utils');
 var generateModel = (commandNames, cost_per_action = 1) => {
@@ -14,7 +15,7 @@ module.exports = {
     description: "register a new DAPP service provider package",
     builder: (yargs) => {
         yargs.option('key', {
-            describe: 'active key for DSP',
+            describe: 'active public key for DSP',
         }).option('api-endpoint', {
             describe: 'DSP API endpoint',
         }).option('package-json-uri', {
@@ -56,7 +57,7 @@ module.exports = {
         var serviceContract = args['service-contract'] || serviceModel.contract;
         var eos = await getEos();
         var contractInstance = await eos.contract(args['dappservices-contract']);
-
+        console.log(emojMap.zap + `registering package:${args['package-id']}`)
         try {
             await contractInstance.regpkg({
                 newpackage: {
@@ -94,9 +95,9 @@ module.exports = {
             });
         }
         catch (e) {
-            console.log("failed", e);
+            console.log(emojMap.white_frowning_face + "failed", e);
             return;
         }
-        console.log(`package:${args['package-id']} registered successfully`)
+        console.log(emojMap.ok + `package:${args['package-id']} registered successfully`)
     }
 }

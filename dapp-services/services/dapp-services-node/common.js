@@ -66,10 +66,12 @@ const resolveBackendServiceData = async(service, provider) => {
     var loadedExtension = loadedExtensions.find(a => getContractAccountFor(a) == service);
     if (!loadedExtension)
         return;
-
+    var host = process.env[`DAPPSERVICE_HOST_${loadedExtension.name.toUpperCase()}`];
+    if (!host)
+        host = 'localhost';
     return {
         internal: true,
-        endpoint: "http://localhost:" + loadedExtension.port
+        endpoint: `http://${host}:${loadedExtension.port}`
     }
 }
 const resolveExternalProviderData = async(service, provider) => {
