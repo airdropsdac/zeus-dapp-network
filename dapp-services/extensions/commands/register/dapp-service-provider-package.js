@@ -15,7 +15,7 @@ module.exports = {
     description: "register a new DAPP service provider package",
     builder: (yargs) => {
         yargs.option('key', {
-            describe: 'active public key for DSP',
+            describe: 'active private key for DSP',
         }).option('api-endpoint', {
             describe: 'DSP API endpoint',
         }).option('package-json-uri', {
