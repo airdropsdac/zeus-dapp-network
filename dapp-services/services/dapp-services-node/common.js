@@ -39,6 +39,7 @@ var eosconfig = {
     expireInSeconds: 1200,
     sign: true,
 };
+
 if (network.secured) {
     eosconfig.httpsEndpoint = 'https://' + network.host + ':' + network.port;
 }
