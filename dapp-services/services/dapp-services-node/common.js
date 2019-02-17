@@ -48,6 +48,17 @@ else {
 
 const nodeosEndpoint = eosconfig.httpEndpoint;
 const proxy = httpProxy.createProxyServer();
+
+
+proxy.on('error', function(err, req, res) {
+    res.writeHead(500, {
+        'Content-Type': 'text/plain'
+    });
+
+    res.end('DSP Proxy error.');
+});
+
+
 var eosPrivate = new Eos(eosconfig);
 const forwardEvent = async(act, endpoint, redirect) => {
     if (redirect)
