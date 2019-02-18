@@ -22,7 +22,7 @@ module.exports = {
             default: "logservices1"
         }).option('dappservices-contract-ipfs', {
             describe: 'ipfs service contract account (only for testing)',
-            default: "ipfservice1"
+            default: "ipfsservice1"
         }).option('cluster-name', {
             describe: 'helm release name',
             default: "dsp"
