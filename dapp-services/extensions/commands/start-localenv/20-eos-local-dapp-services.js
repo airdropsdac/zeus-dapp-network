@@ -3,9 +3,9 @@ const providerRunHandler = require('../run/dapp-services-node');
 
 const artifacts = require('../../tools/eos/artifacts');
 const deployer = require('../../tools/eos/deployer');
-const {getCreateAccount} = require('../../tools/eos/utils');
+const { getCreateAccount } = require('../../tools/eos/utils');
 
-const {dappServicesContract} = require("../../tools/eos/dapp-services")
+const { dappServicesContract } = require("../../tools/eos/dapp-services")
 const servicescontract = dappServicesContract;
 var servicesC = artifacts.require(`./dappservices/`);
 
@@ -23,7 +23,8 @@ async function deployLocalExtensions() {
     var inflation = 0.01;
     await deployedContract.contractInstance.create({
         maximum_supply_amount: 500000000 * 10000,
-        inflation_per_block: Math.pow(1.00 + inflation,1.0/(numberOfBlocksToTwice)) - 1.0
+        inflation_per_block: Math.pow(1.00 + inflation, 1.0 / (numberOfBlocksToTwice)) - 1.0,
+        inflation_starts_at: new Date().getTime()
     }, {
         authorization: `${servicescontract}@active`,
         broadcast: true,
@@ -32,8 +33,7 @@ async function deployLocalExtensions() {
     return deployedContract;
 }
 
-module.exports = async(args)=>{
+module.exports = async(args) => {
     await deployLocalExtensions();
     return providerRunHandler.handler(args);
-};  
-  
+};

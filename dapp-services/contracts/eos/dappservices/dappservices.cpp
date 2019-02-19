@@ -1,7 +1,9 @@
 #include "./dappservices.hpp"
+#include <cmath>
 #include <eosiolib/eosio.hpp>
 #include <eosiolib/transaction.hpp>
 using namespace eosio;
+using namespace std;
 
 #define EMIT_USAGE_REPORT_EVENT(usageResult)                                   \
   START_EVENT("usage_report", "1.4")                                           \
@@ -31,6 +33,7 @@ public:
   TABLE currency_stats_ext {
     asset staked;
     double inflation_per_block;
+    uint64_t last_inflation_ts;
     uint64_t primary_key() const { return staked.symbol.code().raw(); }
   };
 
@@ -133,7 +136,7 @@ public:
 
   typedef eosio::multi_index<"stat"_n, currency_stats> stats;
   typedef eosio::multi_index<"statext"_n, currency_stats_ext> stats_ext;
-  typedef eosio::multi_index<"accounts"_n, account> accounts;
+  typedef eosio::multi_index<"account"_n, account> accounts;
   typedef eosio::multi_index<"reward"_n, reward> rewards_t;
   
   
@@ -150,7 +153,7 @@ public:
 
   // token
 
-  ACTION create(uint64_t maximum_supply_amount, double inflation_per_block) {
+  ACTION create(uint64_t maximum_supply_amount, double inflation_per_block, uint64_t inflation_starts_at) {
     require_auth(_self);
     eosio_assert(maximum_supply_amount > 0, "max-supply must be positive");
     auto issuer = _self;
@@ -171,6 +174,7 @@ public:
     statxstable.emplace(_self, [&](auto &s) {
       s.staked.symbol = maximum_supply.symbol;
       s.inflation_per_block = inflation_per_block;
+      s.last_inflation_ts = inflation_starts_at;
     });
     statstable.emplace(_self, [&](auto &s) {
       s.supply.symbol = maximum_supply.symbol;
@@ -639,6 +643,44 @@ private:
     const auto &stx = *existingx;
     const auto &st = *existing;
     double inflation = stx.inflation_per_block;
+    
+    auto current_time_ms = current_time() / 1000;
+    
+    uint64_t last_inflation_ts = stx.last_inflation_ts;
+    
+    if(current_time_ms <= last_inflation_ts + 500)
+      return 0;
+    
+    uint64_t passed_blocks = (current_time_ms - last_inflation_ts) / 500;
+    if(passed_blocks < 0)
+      return 0;
+    
+    
+    
+    // calc global inflation
+    double total_inflation_amount = (pow(1.0 + inflation, passed_blocks) - 1.0) * st.supply.amount;
+    asset inflation_asset;
+    inflation_asset.symbol = sym;
+    inflation_asset.amount = total_inflation_amount;
+
+    // increase balance for self
+    add_balance(_self, inflation_asset, _self);
+    
+    // increase supply
+    statstable.modify(st, eosio::same_payer,
+                      [&](auto &s) { 
+                        s.supply += inflation_asset; 
+                        
+                      });
+    
+    // save last inflation point
+    statsexts.modify(stx, eosio::same_payer,
+                      [&](auto &s) { 
+                        s.last_inflation_ts = current_time_ms;
+                        
+                      });
+    
+    
     double stakeRatio = 1.0 * stx.staked.amount / st.supply.amount;
     return inflation / stakeRatio;
   }
@@ -711,8 +753,9 @@ private:
         acct.package_started + (newpackage.package_period * 1000);
   }
   void dist_rewards(name payer, name provider, name service) {
-
     auto inflationFactor = applyInflation();
+    if(inflationFactor == 0)
+      return;
     auto current_time_ms = (current_time() / 1000);
     // set last_block
     accountexts_t accountexts(_self, DAPPSERVICES_SYMBOL.code().raw());
@@ -727,7 +770,9 @@ private:
     auto current_stake = acctr.balance.amount;
     
     uint64_t passed_blocks = (current_time_ms - acctr.last_reward) / 500;
-    uint64_t amount = current_stake * passed_blocks * inflationFactor;
+    
+    
+    uint64_t amount = (pow(1.0 + inflationFactor, passed_blocks) - 1.0) * current_stake;
     refillPackage(payer, provider, service, acctr);
     
     if(acctr.last_reward == 0){
@@ -771,9 +816,6 @@ private:
                  "symbol precision mismatch");
     eosio_assert(quantity.amount <= st.max_supply.amount - st.supply.amount,
                  "quantity exceeds available supply");
-
-    statstable.modify(st, eosio::same_payer,
-                      [&](auto &s) { s.supply += quantity; });
 
     
     rewards_t rewards(_self, provider.value);
