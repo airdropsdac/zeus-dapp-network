@@ -14,7 +14,7 @@ async function deployLocalExtensions() {
     var deployedContract = await deployer.deploy(servicesC, servicescontract);
     var provider = "pprovider1";
     var key = await getCreateAccount(provider);
-    var blocksPerSecond = 60 * 2;
+    var blocksPerSecond = 2;
     var blocksPerMinute = 60 * blocksPerSecond;
     var blocksPerHour = 60 * blocksPerMinute;
     var blocksPerDay = 24 * blocksPerHour;

@@ -357,7 +357,7 @@ struct usage_t {
 
   typedef eosio::multi_index<"stat"_n, currency_stats> stats;
   typedef eosio::multi_index<"statext"_n, currency_stats_ext> stats_ext;
-  typedef eosio::multi_index<"account"_n, account> accounts;
+  typedef eosio::multi_index<"accounts"_n, account> accounts;
   typedef eosio::multi_index<"reward"_n, reward> rewards_t;
   
   
