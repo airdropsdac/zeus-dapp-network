@@ -492,8 +492,6 @@ public:
       a.balance -= rewardAsset;
     });
 
-    add_balance(_self, rewardAsset, _self);
-    
     action(permission_level{_self, "active"_n}, _self, "transfer"_n,
            std::make_tuple(_self, provider, rewardAsset, std::string("rewards")))
         .send();
