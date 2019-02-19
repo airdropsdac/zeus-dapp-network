@@ -255,7 +255,7 @@ public:
                       [&](auto &s) { s.supply += quantity; });
 
     add_balance(st.issuer, quantity, st.issuer);
-
+    applyInflation();
     if (to != st.issuer) {
       action(permission_level{st.issuer, "active"_n}, _self, "transfer"_n,
              std::make_tuple(st.issuer, to, quantity, memo))
@@ -304,7 +304,7 @@ public:
     eosio_assert(memo.size() <= 256, "memo has more than 256 bytes");
 
     auto payer = has_auth(to) ? to : from;
-
+    applyInflation();
     sub_balance(from, quantity);
     add_balance(to, quantity, payer);
   }
