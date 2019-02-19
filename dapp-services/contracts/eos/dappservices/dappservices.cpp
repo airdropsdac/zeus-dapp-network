@@ -651,17 +651,17 @@ private:
     if(current_time_ms <= last_inflation_ts + 500)
       return 0;
     
-    uint64_t passed_blocks = (current_time_ms - last_inflation_ts) / 500;
-    if(passed_blocks < 0)
+    int64_t passed_blocks = (current_time_ms - last_inflation_ts) / 500;
+    if(passed_blocks <= 0)
       return 0;
-    
-    
     
     // calc global inflation
     double total_inflation_amount = (pow(1.0 + inflation, passed_blocks) - 1.0) * st.supply.amount;
     asset inflation_asset;
     inflation_asset.symbol = sym;
     inflation_asset.amount = total_inflation_amount;
+    if(inflation_asset.amount <= 0)
+      return 0;
 
     // increase balance for self
     add_balance(_self, inflation_asset, _self);

@@ -20,7 +20,7 @@ async function deployLocalExtensions() {
     var blocksPerDay = 24 * blocksPerHour;
     var blocksPerYear = 365 * blocksPerDay;
     var numberOfBlocksToTwice = blocksPerYear;
-    var inflation = 1.01;
+    var inflation = 0.02;
     await deployedContract.contractInstance.create({
         maximum_supply_amount: 5000000000 * 10000,
         inflation_per_block: Math.pow(1.00 + inflation, 1.0 / (numberOfBlocksToTwice)) - 1.0,
@@ -30,6 +30,17 @@ async function deployLocalExtensions() {
         broadcast: true,
         sign: true
     });
+    await deployedContract.contractInstance.issue({
+        to: servicescontract,
+        quantity: "1000000000.0000 DAPP",
+        memo: ""
+    }, {
+        authorization: `${servicescontract}@active`,
+        broadcast: true,
+        sign: true,
+    });
+
+
     return deployedContract;
 }
 
