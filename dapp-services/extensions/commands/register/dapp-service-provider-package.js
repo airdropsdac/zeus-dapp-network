@@ -55,7 +55,7 @@ module.exports = {
         if (!serviceModel)
             throw new Error("service not found: " + args['service']);
         var serviceContract = args['service-contract'] || serviceModel.contract;
-        var eos = await getEos();
+        var eos = await getEos(null, args);
         var contractInstance = await eos.contract(args['dappservices-contract']);
         console.log(emojMap.zap + `registering package:${args['package-id']}`)
         try {
