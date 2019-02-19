@@ -306,6 +306,7 @@ struct usage_t {
 
   TABLE reward {
     asset balance;
+    uint64_t last_usage;
     uint64_t primary_key() const { return balance.symbol.code().raw(); }
   };
 
