@@ -483,11 +483,11 @@ public:
     auto reward = rewards.find(DAPPSERVICES_SYMBOL.code().raw());
     eosio_assert(reward != rewards.end(), "no pending rewards");
     auto min_interval = 24 * 60 * 60 * 1000;
-    eosio_assert(reward->last_reward + min_interval < current_time_ms, "already claimed in the last 24h");
+    eosio_assert(reward->last_usage + min_interval < current_time_ms, "already claimed in the last 24h");
     asset rewardAsset;
     rewards.modify(reward, eosio::same_payer, [&](auto &a) {
       rewardAsset = a.balance;
-      a.last_reward = current_time_ms;
+      a.last_usage = current_time_ms;
       // read + modify rewards (reset)
       a.balance -= rewardAsset;
     });
