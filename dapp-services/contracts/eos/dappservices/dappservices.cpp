@@ -646,37 +646,37 @@ private:
     
     uint64_t last_inflation_ts = stx.last_inflation_ts;
     
-    if(current_time_ms <= last_inflation_ts + 500)
-      return 0;
-    
-    int64_t passed_blocks = (current_time_ms - last_inflation_ts) / 500;
-    if(passed_blocks <= 0)
-      return 0;
-    
-    // calc global inflation
-    double total_inflation_amount = (pow(1.0 + inflation, passed_blocks) - 1.0) * st.supply.amount;
-    asset inflation_asset;
-    inflation_asset.symbol = sym;
-    inflation_asset.amount = total_inflation_amount;
-    if(inflation_asset.amount <= 0)
-      return 0;
-
-    // increase balance for self
-    add_balance(_self, inflation_asset, _self);
-    
-    // increase supply
-    statstable.modify(st, eosio::same_payer,
-                      [&](auto &s) { 
-                        s.supply += inflation_asset; 
-                        
-                      });
-    
-    // save last inflation point
-    statsexts.modify(stx, eosio::same_payer,
-                      [&](auto &s) { 
-                        s.last_inflation_ts = current_time_ms;
-                        
-                      });
+    if(current_time_ms > last_inflation_ts + 500){
+      int64_t passed_blocks = (current_time_ms - last_inflation_ts) / 500;
+      if(passed_blocks > 0){
+        
+      
+      // calc global inflation
+      double total_inflation_amount = (pow(1.0 + inflation, passed_blocks) - 1.0) * st.supply.amount;
+      asset inflation_asset;
+      inflation_asset.symbol = sym;
+      inflation_asset.amount = total_inflation_amount;
+      if(inflation_asset.amount > 0){
+                  // increase balance for self
+          add_balance(_self, inflation_asset, _self);
+          
+          // increase supply
+          statstable.modify(st, eosio::same_payer,
+                            [&](auto &s) { 
+                              s.supply += inflation_asset; 
+                              
+                            });
+          
+          // save last inflation point
+          statsexts.modify(stx, eosio::same_payer,
+                            [&](auto &s) { 
+                              s.last_inflation_ts = current_time_ms;
+                              
+                            });
+        }
+          
+      }
+    }
     
     
     double stakeRatio = 1.0 * stx.staked.amount / st.supply.amount;
