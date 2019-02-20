@@ -680,7 +680,7 @@ private:
     
     
     double stakeRatio = 1.0 * stx.staked.amount / st.supply.amount;
-    return inflation / stakeRatio;
+    return stakeRatio;
   }
   uint64_t getUnstakeRemaining(name payer, name provider, name service) {
 
@@ -770,8 +770,15 @@ private:
     double amount = 0.0;
     if(current_time_ms > acctr.last_reward && acctr.last_reward != 0){
       int64_t passed_blocks = (current_time_ms - acctr.last_reward) / 500;
+      auto sym = DAPPSERVICES_SYMBOL;
+      stats_ext statsexts(_self, sym.code().raw());
+      auto existingx = statsexts.find(sym.code().raw());
+      eosio_assert(existingx != statsexts.end(),
+                   "token with symbol does not exist");
+      const auto &stx = *existingx;
+      double inflation = stx.inflation_per_block;
       if(passed_blocks > 0){
-        amount = (pow(1.0 + inflationFactor, passed_blocks) - 1.0) * current_stake;  
+        amount = (pow(1.0 + inflation, passed_blocks) - 1.0) * (current_stake*inflationFactor);
       }
     }
       
