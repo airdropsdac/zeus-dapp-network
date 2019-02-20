@@ -767,22 +767,27 @@ private:
     accountext &acctr = (accountext &)*acct;
     auto current_stake = acctr.balance.amount;
     
-    uint64_t passed_blocks = (current_time_ms - acctr.last_reward) / 500;
-    
-    
-    uint64_t amount = (pow(1.0 + inflationFactor, passed_blocks) - 1.0) * current_stake;
+    double amount = 0.0;
+    if(current_time_ms > acctr.last_reward && acctr.last_reward != 0){
+      int64_t passed_blocks = (current_time_ms - acctr.last_reward) / 500;
+      if(passed_blocks > 0){
+        amount = (pow(1.0 + inflationFactor, passed_blocks) - 1.0) * current_stake;  
+      }
+    }
+      
+  
     refillPackage(payer, provider, service, acctr);
     
     if(acctr.last_reward == 0){
       acctr.last_reward = current_time_ms;
-      amount = 0;
+      amount = 0.0;
     }
     
+    asset quantity;
+    quantity.symbol = DAPPSERVICES_SYMBOL;
+    quantity.amount = amount;
     // enough for reward
-    if(amount > 0){
-      asset quantity;
-      quantity.symbol = DAPPSERVICES_SYMBOL;
-      quantity.amount = amount;
+    if(quantity.amount > 0){
       acctr.last_reward = current_time_ms;
       giveRewards(provider, service, quantity);
     }
