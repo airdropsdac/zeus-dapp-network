@@ -678,8 +678,9 @@ private:
       }
     }
     
-    
-    double stakeRatio = 1.0 * stx.staked.amount / st.supply.amount;
+    if(stx.staked.amount == 0)
+      return 0;
+    double stakeRatio = (1.0 * st.supply.amount) / stx.staked.amount;
     return stakeRatio;
   }
   uint64_t getUnstakeRemaining(name payer, name provider, name service) {
