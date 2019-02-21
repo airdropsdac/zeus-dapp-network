@@ -14,6 +14,12 @@ RUN curl -o /bin/aws-iam-authenticator https://amazon-eks.s3-us-west-2.amazonaws
 RUN chmod +x /bin/aws-iam-authenticator
 RUN curl https://raw.githubusercontent.com/helm/helm/master/scripts/get | bash
 
+RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
+    echo "deb http://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && \
+    curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - && \
+    apt-get update -y && apt-get install google-cloud-sdk -y && \
+    rm -rf /var/lib/apt/lists/*
+
 RUN npm install -g @liquidapps/zeus-cmd
 RUN helm init -c
 WORKDIR /
