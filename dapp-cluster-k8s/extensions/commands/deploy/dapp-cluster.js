@@ -34,9 +34,10 @@ module.exports = {
             `--set eosnode.snapshot=${args['snapshot'] == 'true'}`,
             `--set eosnode.replay=${args['full-replay'] == 'true'}`,
             `--set dspnode.contracts.dappservices=${args['dappservices-contract']}`,
-            `--set dspnode.contracts.ipfs=${args['dappservices-contract-logs']}`,
+            `--set dspnode.contracts.ipfs=${args['dappservices-contract-ipfs']}`,
+            `--set dspnode.contracts.logs=${args['dappservices-contract-logs']}`,
             `--set dspnode.dspaccount=${args['dspaccount']}`,
-            `--set dspnode.dspaccount=${args['key']}`
+            `--set dspnode.dspkey=${args['key']}`
         ];
         try {
             await execPromise(`helm install ${helmargs.join(' ')} . --name ${args['cluster-name']}`, { cwd: path.resolve('./dapp-dsp-k8s-helm') });
