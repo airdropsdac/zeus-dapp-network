@@ -307,7 +307,10 @@ struct usage_t {
   TABLE reward {
     asset balance;
     uint64_t last_usage;
-    uint64_t primary_key() const { return balance.symbol.code().raw(); }
+    
+    asset total_staked; 
+    uint64_t last_inflation_ts;
+    uint64_t primary_key() const { return DAPPSERVICES_SYMBOL.code().raw(); }
   };
 
   TABLE accountext {

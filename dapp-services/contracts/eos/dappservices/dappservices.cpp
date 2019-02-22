@@ -87,6 +87,9 @@ public:
   TABLE reward {
     asset balance;
     uint64_t last_usage;
+    
+    asset total_staked; 
+    uint64_t last_inflation_ts;
     uint64_t primary_key() const { return DAPPSERVICES_SYMBOL.code().raw(); }
   };
 
@@ -543,7 +546,16 @@ private:
 
     cidx.modify(acct, eosio::same_payer,
                 [&](auto &a) { a.balance -= quantity; });
+                
+    auto current_time_ms = current_time() / 1000;
+    rewards_t rewards(_self, provider.value);
+    auto reward = rewards.find(DAPPSERVICES_SYMBOL.code().raw());
+    eosio_assert(reward != rewards.end(), "provider not found");
+    rewards.modify(reward, _self, [&](auto &a) { 
+      a.total_staked -= quantity; 
+    });
   }
+  
   void add_provider_balance(name owner, name service, name provider,
                             asset quantity) {
     accountexts_t accountexts(_self, DAPPSERVICES_SYMBOL.code().raw());
@@ -556,6 +568,22 @@ private:
 
     cidx.modify(acct, eosio::same_payer,
                 [&](auto &a) { a.balance += quantity; });
+                
+    auto current_time_ms = current_time() / 1000;
+    rewards_t rewards(_self, provider.value);
+    auto reward = rewards.find(DAPPSERVICES_SYMBOL.code().raw());
+    if (reward != rewards.end()) {
+      rewards.modify(reward, _self, [&](auto &a) { 
+        a.total_staked += quantity;
+      });
+    } else {
+      rewards.emplace(_self, [&](auto &a) { 
+        a.total_staked = quantity; 
+        a.last_inflation_ts = current_time_ms;
+        a.balance.symbol = quantity.symbol;
+      });
+    }
+
   }
   void choose_package(name owner, name service, name provider, name package) {
     accountexts_t accountexts(_self, DAPPSERVICES_SYMBOL.code().raw());
@@ -628,7 +656,7 @@ private:
     cancel_deferred(to.value);
     trx.send(to.value, _self, true);
   }
-  double applyInflation() {
+  void applyInflation() {
     auto sym = DAPPSERVICES_SYMBOL;
     stats_ext statsexts(_self, sym.code().raw());
     stats statstable(_self, sym.code().raw());
@@ -646,42 +674,33 @@ private:
     
     uint64_t last_inflation_ts = stx.last_inflation_ts;
     
-    if(current_time_ms > last_inflation_ts + 500){
-      int64_t passed_blocks = (current_time_ms - last_inflation_ts) / 500;
-      if(passed_blocks > 0){
-        
-      
-      // calc global inflation
-      double total_inflation_amount = (pow(1.0 + inflation, passed_blocks) - 1.0) * st.supply.amount;
-      asset inflation_asset;
-      inflation_asset.symbol = sym;
-      inflation_asset.amount = total_inflation_amount;
-      if(inflation_asset.amount > 0){
-                  // increase balance for self
-          add_balance(_self, inflation_asset, _self);
-          
-          // increase supply
-          statstable.modify(st, eosio::same_payer,
-                            [&](auto &s) { 
-                              s.supply += inflation_asset; 
-                              
-                            });
-          
-          // save last inflation point
-          statsexts.modify(stx, eosio::same_payer,
-                            [&](auto &s) { 
-                              s.last_inflation_ts = current_time_ms;
-                              
-                            });
-        }
-          
-      }
-    }
+    if(current_time_ms <= last_inflation_ts + 500)
+      return;
+  
+    int64_t passed_blocks = (current_time_ms - last_inflation_ts) / 500;
+    if(passed_blocks <= 0)
+      return;
+
     
-    if(stx.staked.amount == 0)
-      return 0;
-    double stakeRatio = (1.0 * st.supply.amount) / stx.staked.amount;
-    return stakeRatio;
+    // calc global inflation
+    double total_inflation_amount = (pow(1.0 + inflation, passed_blocks) - 1.0) * st.supply.amount;
+    asset inflation_asset;
+    inflation_asset.symbol = sym;
+    inflation_asset.amount = total_inflation_amount;
+    if(inflation_asset.amount <= 0)
+      return
+              // increase balance for self
+    add_balance(_self, inflation_asset, _self);
+    // increase supply
+    statstable.modify(st, eosio::same_payer,
+                      [&](auto &s) { 
+                        s.supply += inflation_asset; 
+                      });
+    // save last inflation point
+    statsexts.modify(stx, eosio::same_payer,
+                      [&](auto &s) { 
+                        s.last_inflation_ts = current_time_ms;
+                      });
   }
   uint64_t getUnstakeRemaining(name payer, name provider, name service) {
 
@@ -752,12 +771,13 @@ private:
         acct.package_started + (newpackage.package_period * 1000);
   }
   void dist_rewards(name payer, name provider, name service) {
-    auto inflationFactor = applyInflation();
-    if(inflationFactor == 0)
-      return;
+    applyInflation();
     auto current_time_ms = (current_time() / 1000);
     // set last_block
-    accountexts_t accountexts(_self, DAPPSERVICES_SYMBOL.code().raw());
+    rewards_t rewards(_self, provider.value);
+    auto reward = rewards.find(DAPPSERVICES_SYMBOL.code().raw());
+    auto sym = DAPPSERVICES_SYMBOL;
+    accountexts_t accountexts(_self, sym.code().raw());
     auto idxKey =
         accountext::_by_account_service_provider(payer, service, provider);
     auto cidx = accountexts.get_index<"byprov"_n>();
@@ -767,39 +787,40 @@ private:
     
     accountext &acctr = (accountext &)*acct;
     auto current_stake = acctr.balance.amount;
-    
-    double amount = 0.0;
-    if(current_time_ms > acctr.last_reward && acctr.last_reward != 0){
-      int64_t passed_blocks = (current_time_ms - acctr.last_reward) / 500;
-      auto sym = DAPPSERVICES_SYMBOL;
+    refillPackage(payer, provider, service, acctr);
+    if(reward != rewards.end()){
+      // calculate reward
+      double amount = 0.0;
+      
       stats_ext statsexts(_self, sym.code().raw());
       auto existingx = statsexts.find(sym.code().raw());
       eosio_assert(existingx != statsexts.end(),
-                   "token with symbol does not exist");
+                 "token with symbol does not exist");
       const auto &stx = *existingx;
-      double inflation = stx.inflation_per_block;
-      if(passed_blocks > 0){
-        amount = (pow(1.0 + inflation, passed_blocks) - 1.0) * (current_stake*inflationFactor);
-      }
-    }
       
-  
-    refillPackage(payer, provider, service, acctr);
-    
-    if(acctr.last_reward == 0){
-      acctr.last_reward = current_time_ms;
-      amount = 0.0;
+      double inflation = stx.inflation_per_block;
+      int64_t passed_blocks = (current_time_ms - reward->last_inflation_ts) / 500;
+      if(passed_blocks > 0){
+        auto current_stake = reward->total_staked.amount;
+        stats statstable(_self, sym.code().raw());
+        auto existing = statstable.find(sym.code().raw());
+        eosio_assert(existing != statstable.end(),
+                     "token with symbol does not exist");
+        const auto &st = *existing;
+        auto totalStakeFactor = (1.0 * st.supply.amount) / stx.staked.amount;
+        amount = (pow(1.0 + inflation, passed_blocks) - 1.0) * (current_stake*totalStakeFactor);
+      }
+      
+      asset quantity;
+      quantity.symbol = DAPPSERVICES_SYMBOL;
+      quantity.amount = amount;
+      if(quantity.amount > 0){
+        acctr.last_reward = current_time_ms;
+        giveRewards(provider, service, quantity);
+      }
+        
+       
     }
-    
-    asset quantity;
-    quantity.symbol = DAPPSERVICES_SYMBOL;
-    quantity.amount = amount;
-    // enough for reward
-    if(quantity.amount > 0){
-      acctr.last_reward = current_time_ms;
-      giveRewards(provider, service, quantity);
-    }
-    
     cidx.modify(acct, eosio::same_payer, [&](auto &a) {
       a.quota = acctr.quota;
       a.package_started = acctr.package_started;
@@ -812,7 +833,7 @@ private:
 
   void giveRewards(name provider, name service, asset quantity) {
     auto sym = DAPPSERVICES_SYMBOL;
-    
+    auto current_time_ms = (current_time() / 1000);
     
     stats statstable(_self, sym.code().raw());
     auto existing = statstable.find(sym.code().raw());
@@ -832,10 +853,14 @@ private:
     rewards_t rewards(_self, provider.value);
     auto reward = rewards.find(DAPPSERVICES_SYMBOL.code().raw());
     if (reward != rewards.end()) {
-      rewards.modify(reward, _self, [&](auto &a) { a.balance += quantity; });
+      rewards.modify(reward, _self, [&](auto &a) { 
+        a.balance += quantity; 
+        a.last_inflation_ts = current_time_ms;
+      });
     } else {
       rewards.emplace(_self, [&](auto &a) { 
-        a.balance = quantity; 
+        a.balance = quantity;
+        a.last_inflation_ts = current_time_ms;
       });
     }
   }
