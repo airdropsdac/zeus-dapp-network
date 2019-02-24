@@ -50,12 +50,20 @@ const handleRequest = async(handler, act, packageid, serviceName, abi) => {
 
 const actionHandlers = {
     'service_request': async(act, simulated, serviceName, handlers) => {
+        let isReplay = act.replay;
         let { service, payer, provider, action, data } = act.event;
         var handler = handlers[action];
         var models = await loadModels('dapp-services');
         var model = models.find(m => m.name == serviceName);
+        if (isReplay && provider == "") {
+            provider = paccount;
+            if (!(getContractAccountFor(model) == service && handler))
+                return;
+            await handleRequest(handler, act, packageid, serviceName, handlers.abi);
+            return;
+        }
         provider = await resolveProvider(payer, service, provider);
-        var packageid = await resolveProviderPackage(payer, service, provider);
+        var packageid = isReplay ? "replaypackage" : await resolveProviderPackage(payer, service, provider);
         if (!simulated) {
             if (!(getContractAccountFor(model) == service && handler))
                 return;

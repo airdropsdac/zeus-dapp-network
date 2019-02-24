@@ -10,7 +10,12 @@ const actionHandlers = {
     'service_request': async(act, simulated) => {
         let { service, provider } = act.event;
         var payer = act.receiver;
-        provider = await resolveProvider(payer, service, provider);
+        let isReplay = act.replay;
+        if (isReplay && provider == "") {
+            provider = paccount;
+        }
+        else
+            provider = await resolveProvider(payer, service, provider);
         var providerData = await resolveProviderData(service, provider);
         if (!providerData)
             throw new Error("provider data not found");
@@ -43,7 +48,7 @@ const actionHandlers = {
 
 
 genNode(actionHandlers, process.env.PORT || 3115, "services");
-
+var isReplay = false;
 const appWebHookListener = genApp();
 appWebHookListener.post('/', async(req, res) => {
     // var account = req.body.account;
@@ -52,6 +57,7 @@ appWebHookListener.post('/', async(req, res) => {
     // var event = req.body.event;
     // var data = req.body.data;
     // console.log("req.body",req.body);
+    req.body.replay = isReplay;
     await processFn(actionHandlers, req.body);
     res.send(JSON.stringify("ok"));
 });
