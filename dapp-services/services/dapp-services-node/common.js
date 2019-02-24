@@ -7,7 +7,7 @@ const bodyParser = require('body-parser');
 const express = require('express');
 const cors = require('cors');
 const httpProxy = require('http-proxy');
-import BigNumber from 'bignumber.js';
+const { BigNumber } = require('bignumber.js');
 
 const networks = [{
         name: "Main Net",
@@ -237,6 +237,16 @@ const handleAction = async(actionHandlers, action, simulated, serviceName, handl
     }
     return res;
 };
+
+const rollBack = async(garbage, actionHandlers, serviceName, handlers) => {
+    return await Promise.all(garbage.map(async rollbackAction => {
+        try {
+            return processFn(actionHandlers, rollbackAction, true, serviceName, handlers);
+        }
+        catch (e) {}
+    }));
+}
+
 var getRawBody = require('raw-body');
 const genNode = async(actionHandlers, port, serviceName, handlers, abi) => {
     if (handlers)
@@ -272,17 +282,17 @@ const genNode = async(actionHandlers, port, serviceName, handlers, abi) => {
                 }
                 return;
             }
+            var trys = 0;
+            var garbage = [];
             while (true) {
                 var r = await fetch(nodeosEndpoint + uri, { method: 'POST', body: JSON.stringify(body) });
                 var resText = await r.text();
                 try {
                     var rText = JSON.parse(resText);
                     if (r.status == 500) {
-
                         var details = rText.error.details;
                         var detailMsg = details.find(d => d.message.indexOf(": required service") != -1);
                         if (detailMsg) {
-
                             var jsons = details[details.indexOf(detailMsg) + 1].message.split(': ', 2)[1].split('\n').filter(a => a.trim() != '');
                             var currentEvent;
                             for (var i = 0; i < jsons.length; i++) {
@@ -305,9 +315,11 @@ const genNode = async(actionHandlers, port, serviceName, handlers, abi) => {
                                 event,
                                 exception: true
                             }
+
                             var endpoint = await processFn(actionHandlers, actionObject, true, serviceName, handlers);
                             if (endpoint === 'retry') {
-                                console.log("retrying")
+                                garbage.push({ ...actionObject, rollback: true });
+                                console.log("Service request done:", trys++);
                                 continue;
                             }
                             else if (endpoint) {
@@ -315,10 +327,13 @@ const genNode = async(actionHandlers, port, serviceName, handlers, abi) => {
                                 resText = await r.text();
                                 rText = JSON.parse(resText);
                             }
+                            if (r.status == 500)
+                                await rollBack(garbage, actionHandlers, serviceName, handlers);
                             res.status(r.status);
                             res.send(JSON.stringify(rText));
                             return;
                         }
+                        await rollBack(garbage, actionHandlers, serviceName, handlers);
                     }
                     else {
                         for (var i = 0; i < rText.processed.action_traces.length; i++) {
@@ -331,6 +346,7 @@ const genNode = async(actionHandlers, port, serviceName, handlers, abi) => {
                     res.send(JSON.stringify(rText));
                 }
                 catch (e) {
+                    await rollBack(garbage, actionHandlers, serviceName, handlers);
                     console.error(e);
                     res.status(500);
                     res.send(JSON.stringify({
