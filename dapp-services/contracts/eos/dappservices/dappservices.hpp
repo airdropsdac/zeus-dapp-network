@@ -200,7 +200,7 @@ struct usage_t {
     }                                                                          \
     else {                                                    \
       switch (action) {                                                        \
-        BUILD_ACTIONS_SVC_HELPER(contract, DAPPSERVICE_ACTIONS_COMMANDS())           \
+        EOSIO_DISPATCH_HELPER(contract, DAPPSERVICE_ACTIONS_COMMANDS())              \
         EOSIO_DISPATCH_HELPER(contract, methods)                               \
         EOSIO_DISPATCH_HELPER(contract, (xsignal))                             \
       }                                                                        \
