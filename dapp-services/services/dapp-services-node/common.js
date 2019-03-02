@@ -59,7 +59,10 @@ proxy.on('error', function(err, req, res) {
     res.end('DSP Proxy error.');
 });
 
-
+// const nameToString = (name) => {
+//     const tmp = new BigNumber(name.toString('hex'), 16);
+//     return Eos.modules.format.decodeName(tmp.toString(), true);
+// }
 var eosPrivate = new Eos(eosconfig);
 const forwardEvent = async(act, endpoint, redirect) => {
     if (redirect)
@@ -246,7 +249,15 @@ const rollBack = async(garbage, actionHandlers, serviceName, handlers) => {
         catch (e) {}
     }));
 }
-
+const notFound = (res, message = "bad endpoint") => {
+    res.status(404);
+    res.send(JSON.stringify({
+        code: 404,
+        error: {
+            details: [{ message }]
+        }
+    }));
+}
 var getRawBody = require('raw-body');
 const genNode = async(actionHandlers, port, serviceName, handlers, abi) => {
     if (handlers)
@@ -256,11 +267,24 @@ const genNode = async(actionHandlers, port, serviceName, handlers, abi) => {
         var uri = req.originalUrl;
         var isServiceRequest = uri.indexOf('/event') == 0;
         var isServiceAPIRequest = uri.indexOf('/v1/dsp/') == 0;
-        if (uri != '/v1/chain/push_transaction' && !isServiceRequest) {
+        var uriParts = uri.split('/');
+        if (uri != '/v1/chain/push_transaction' && !isServiceRequest && !isServiceAPIRequest) {
             proxy.web(req, res, { target: nodeosEndpoint });
             return;
         }
-
+        if (isServiceAPIRequest) {
+            if (uriParts.length < 5)
+                return notFound(res, "bad endpoint format");
+            var service = uriParts[3];
+            if (serviceName == "services") {
+                // forward
+                var providerData = await resolveBackendServiceData(service, paccount);
+                if (!providerData)
+                    return notFound(res, "service not found");
+                proxy.web(req, res, { target: providerData.endpoint });
+                return;
+            }
+        }
 
         getRawBody(req, {
             length: req.headers['content-length'],
@@ -285,59 +309,16 @@ const genNode = async(actionHandlers, port, serviceName, handlers, abi) => {
                 return;
             }
             if (isServiceAPIRequest) {
-                var uriParts = uri.split('/');
-                if (uriParts.length < 5) {
-                    res.status(404);
-                    res.send(JSON.stringify({
-                        code: 404,
-                        error: {
-                            details: [{ message: "bad endpoint" }]
-                        }
-                    }));
-                    return;
-                }
-
-                var service = uriParts[3];
-                if (serviceName != service) {
-                    // forward
-                    var providerData = await resolveBackendServiceData(service, paccount);
-                    if (!providerData) {
-                        res.status(404);
-                        res.send(JSON.stringify({
-                            code: 404,
-                            error: {
-                                details: [{ message: "bad endpoint" }]
-                            }
-                        }));
-                        return;
-                    }
-                    proxy.web(req, res, { target: providerData.endpoint });
-                    return;
-                }
                 // invoke api
-                var api = actionHandlers.api;
-                if (!api) {
-                    res.status(404);
-                    res.send(JSON.stringify({
-                        code: 404,
-                        error: {
-                            details: [{ message: "bad endpoint" }]
-                        }
-                    }));
-                    return;
-                }
+                var api = handlers.api;
+                if (!api)
+                    return notFound(res);
+
                 var methodName = uriParts[4];
                 var method = api[methodName];
-                if (!method) {
-                    res.status(404);
-                    res.send(JSON.stringify({
-                        code: 404,
-                        error: {
-                            details: [{ message: "bad endpoint" }]
-                        }
-                    }));
-                    return;
-                }
+                if (!method)
+                    return notFound(res, "method not found");
+
                 req.body = body;
                 try {
                     await method(req, res);
