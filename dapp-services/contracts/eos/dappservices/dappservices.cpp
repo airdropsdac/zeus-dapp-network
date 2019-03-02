@@ -207,6 +207,8 @@ public:
       r.quota = newpackage.quota;
       r.min_stake_quantity = newpackage.min_stake_quantity;
       r.min_unstake_period = newpackage.min_unstake_period;
+      r.package_json_uri = newpackage.package_json_uri;
+      r.api_endpoint = newpackage.api_endpoint;      
       // a.min_staking_period = newpackage.min_staking_period;
       r.package_period = newpackage.package_period;
     });
@@ -494,7 +496,9 @@ public:
       // read + modify rewards (reset)
       a.balance -= rewardAsset;
     });
-
+    // increase balance for self
+    add_balance(_self, rewardAsset, _self);
+    
     action(permission_level{_self, "active"_n}, _self, "transfer"_n,
            std::make_tuple(_self, provider, rewardAsset, std::string("rewards")))
         .send();
@@ -688,9 +692,8 @@ private:
     inflation_asset.symbol = sym;
     inflation_asset.amount = total_inflation_amount;
     if(inflation_asset.amount <= 0)
-      return
-              // increase balance for self
-    add_balance(_self, inflation_asset, _self);
+      return;
+    
     // increase supply
     statstable.modify(st, eosio::same_payer,
                       [&](auto &s) { 
