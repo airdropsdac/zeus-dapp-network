@@ -17,6 +17,8 @@ const handleRequest = async(handler, act, packageid, serviceName, abi) => {
         return;
 
     act.event.current_provider = paccount;
+    act.event.packageid = packageid;
+
     var responses = await handler(act, data);
     if (!responses)
         return;
