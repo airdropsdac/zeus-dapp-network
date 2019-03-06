@@ -170,7 +170,7 @@ const generateCommandCodeText = (serviceName, commandName, commandModel, service
     return `SVC_ACTION(${commandName}, ${commandModel.blocking}, ${fnArgs(commandModel.request)},     \
          ${fnArgs(commandModel.signal)}, \
          ${fnArgs(commandModel.callback)},"${serviceContract}"_n) { \
-    _${serviceName}_${commandName}(${fnPassArgs(commandModel.callback)}); \
+    _${serviceName}_${commandName}(${fnPassArgs({...commandModel.callback,'current_provider':'name'})}); \
     SEND_SVC_SIGNAL(${commandName}, current_provider, package, ${fnPassArgs(commandModel.signal)})                         \
 };`
 
@@ -179,8 +179,12 @@ const generateCommandCodeText = (serviceName, commandName, commandModel, service
 const generateCommandHelperCodeText = (serviceName, commandName, commandModel) => {
     var rargs = commandModel.request;
     var argsKeys = Object.keys(rargs);
-    var fnArgsWithType = argsKeys.map(name => `${rargs[name]} ${name}`).join(', ');
+
     var fnArgs = argsKeys.join(', ');
+
+    rargs = { ...rargs, 'current_provider': 'name' };
+    var fnArgsWithType = argsKeys.map(name => `${rargs[name]} ${name}`).join(', ');
+
     return `static void svc_${serviceName}_${commandName}(${fnArgsWithType}) { \
     SEND_SVC_REQUEST(${commandName}, ${fnArgs}) \
 };`
