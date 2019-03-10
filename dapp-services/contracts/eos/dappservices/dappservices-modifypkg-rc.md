@@ -1,29 +1,23 @@
-# Register Package
+# Modify Package
 
-The intent of the REGPKG action is to enable the registration of a potential Service Package to be provided by a DAPP Service Provider (“PKG” and ”DSP”, respectively).
+The intent of the REGPKG action is to enable the modification of an existing Service Package provided by a DAPP Service Provider (“PKG” and ”DSP”, respectively).
 Once the action is completed, a DSP’s PKG will be registered in the DAPP Token Smart Contract, enabling users to select it (via SelectPKG action) and use it (via Stake action).
 “Registered PKG” means a PKG that is registered under REGPKG action;
 
 A Registered PKG is comprised of these minimum core elements, which are provided by the DSP (the “PKG Properties”):
 
-PKG ID: {{newpackage.package_id}}
+PKG ID: {{package_id}}
 
-PKG provided by {{newpackage.provider}}
-DSP API address: {{newpackage.api_endpoint}}
+PKG provided by {{provider}}
+DSP API address: {{api_endpoint}}
 
-PKG service type: {{newpackage.service}}
-PKG service type amount (quota) {{newpackage.qouta}}
+PKG service type: {{service}}
 
-PKG specifications, as declared by the DAPP Service Provider and included herein by reference: {{newpackage.package_json_uri}}
-
-The required amount of time the tokens must remain staked (locked) to enable the PKG: {{newpackage.min_unstake_period}}
-
-What is the duration of the PKG: {{newpackage.package_period}}
-How many DAPP Tokens needed to be staked in order to use the PKG: {{newpackage.min_stake_quantity}}
+PKG specifications, as declared by the DAPP Service Provider and included herein by reference: {{package_json_uri}}
 
 Since the DAPP Network is built, operated and developed by its users, it is upon community members to set for themselves whatever terms will apply to transactions on the DAPP Network. Having said that, as a service to the DAPP Network at its early stage and for guidance, LiquidApps can propose the following frame for the <REGPKG> Contract: 
 
-I, {{newpackage.provider}} (the “DSP”), hereby state my interest and readiness to provide that certain Registered PKG to DAPP Token users, utilizing the DAPP Token and related smart contracts deployed on the EOS blockchain (the “DAPP Network”).
+I, {{provider}} (the “DSP”), hereby state my interest and readiness to provide that certain Registered PKG to DAPP Token users, utilizing the DAPP Token and related smart contracts deployed on the EOS blockchain (the “DAPP Network”).
 With respect to the Registered PKG, DSP confirms that:
 It has validated the PKG Properties and that it is capable of supplying the Registered PKG under the PKG Properties.
 Other than as stated in the PKG Properties (specifically, the minimum amount of DAPP Tokens that must be staked to use the PKG: {{newpackage.min_stake_quantity}}), the use of the PKG is not subjected to or conditioned upon any terms.

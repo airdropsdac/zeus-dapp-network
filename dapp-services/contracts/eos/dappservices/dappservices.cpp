@@ -213,6 +213,35 @@ public:
       r.package_period = newpackage.package_period;
     });
   }
+  
+  
+  ACTION modifypkg(name provider, name package_id, name service, std::string api_endpoint, std::string api_endpoint, std::string package_json_uri) {
+    require_auth(provider);
+
+    packages_t packages(_self, _self.value);
+    auto idxKey = package::_by_package_service_provider(
+        package_id, service, provider);
+    auto cidx = packages.get_index<"bypkg"_n>();
+    auto existing = cidx.find(idxKey);
+    eosio_assert(existing != cidx.end(), "missing package");
+    packages.modify(existing, eosio::same_payer, [&](package &r) {
+      // start disabled.
+      // r.enabled = true;
+      // r.id = packages.available_primary_key();
+      // r.provider = newpackage.provider;
+      // r.service = newpackage.service;
+      // r.package_id = newpackage.package_id;
+      // r.quota = newpackage.quota;
+      // r.min_stake_quantity = newpackage.min_stake_quantity;
+      // r.min_unstake_period = newpackage.min_unstake_period;
+      if(package_json_uri != "")
+        r.package_json_uri = package_json_uri;
+      if(api_endpoint != "")
+        r.api_endpoint = api_endpoint;      
+      // a.min_staking_period = newpackage.min_staking_period;
+      // r.package_period = newpackage.package_period;
+    });
+  }
   // ACTION disablepkg(name service, name provider, name package_id) {
   //   packages_t packages(_self, _self.value);
   //   auto idxKey = package::_by_package_service_provider(package_id, service,
@@ -890,7 +919,7 @@ extern "C" {
       EOSIO_DISPATCH_HELPER(
           dappservices, (usage)(stake)(unstake)(refund)(claimrewards)(create)(
                           issue)(transfer)(open)(close)(retire)(selectpkg)(
-                          regpkg)(closeprv))
+                          regpkg)(closeprv)(modifypkg))
     }
   } else {
     switch (action) { EOSIO_DISPATCH_HELPER(dappservices, (xsignal)) }
