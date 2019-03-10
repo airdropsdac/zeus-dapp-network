@@ -224,7 +224,7 @@ public:
     auto cidx = packages.get_index<"bypkg"_n>();
     auto existing = cidx.find(idxKey);
     eosio_assert(existing != cidx.end(), "missing package");
-    packages.modify(existing, eosio::same_payer, [&](package &r) {
+    cidx.modify(existing, eosio::same_payer, [&](package &r) {
       // start disabled.
       // r.enabled = true;
       // r.id = packages.available_primary_key();
