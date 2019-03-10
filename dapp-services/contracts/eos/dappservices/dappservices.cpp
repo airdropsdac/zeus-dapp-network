@@ -215,7 +215,7 @@ public:
   }
   
   
-  ACTION modifypkg(name provider, name package_id, name service, std::string api_endpoint, std::string api_endpoint, std::string package_json_uri) {
+  ACTION modifypkg(name provider, name package_id, name service, std::string api_endpoint, std::string package_json_uri) {
     require_auth(provider);
 
     packages_t packages(_self, _self.value);
