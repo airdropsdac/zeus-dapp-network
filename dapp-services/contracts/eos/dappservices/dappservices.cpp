@@ -343,6 +343,14 @@ public:
     add_balance(to, quantity, payer);
   }
 
+
+  ACTION issuehodl(name to, asset quantity, string memo) {
+    //TODO: issue HODL tokens
+  }
+  ACTION withdraw(name to) {
+    //TODO: withdraw all available vested airhodl tokens
+  }
+
   ACTION open(name owner, symbol_code symbol, name ram_payer) {
     require_auth(ram_payer);
     auto sym = symbol.raw();
@@ -360,6 +368,7 @@ public:
       });
     }
   }
+
   ACTION close(name owner, symbol_code symbol) {
     require_auth(owner);
     accounts acnts(_self, owner.value);
@@ -423,6 +432,17 @@ public:
     add_total_staked(quantity);
   }
 
+  ACTION stakehodl(name from, name provider, name service, asset quantity) {
+    require_auth(from);
+    require_recipient(provider);
+    require_recipient(service);
+    dist_rewards(from, provider, service);
+    add_provider_balance(from, service, provider, quantity);
+    //TODO: add_hodl_stake(from, service, provider, quantity);
+    sub_balance(from, quantity); //TODO: Update to sub_hodl_balance
+    add_total_staked(quantity); 
+  }
+
   ACTION unstake(name to, name provider, name service, asset quantity) {
     require_auth(to);
     require_recipient(provider);
@@ -459,7 +479,44 @@ public:
     scheduleRefund(secondsLeft, to, provider, service, quantity.symbol.code());
   }
 
+  ACTION unstakehodl(name to, name provider, name service, asset quantity) {
+    require_auth(to);
+    require_recipient(provider);
+    require_recipient(service);
+    dist_rewards(to, provider, service);
+    auto current_time_ms = current_time() / 1000;
+    uint64_t unstake_time = current_time_ms + getUnstakeRemaining(to,provider,service);
+    
+    // set account->provider->service->unstake_time
+
+    hodl_refunds_table refunds_tbl(_self, to.value);
+    auto idxKey = refundreq::_by_symbol_service_provider(
+        quantity.symbol.code(), service, provider);
+    auto cidx = refunds_tbl.get_index<"byprov"_n>();
+    auto req = cidx.find(idxKey);
+    if (req != cidx.end()) {
+      cidx.modify(req, eosio::same_payer, [&](refundreq &r) {
+        r.unstake_time = unstake_time;
+        r.amount += quantity;
+      });
+    } else {
+      refunds_tbl.emplace(to, [&](refundreq &r) {
+        r.id = refunds_tbl.available_primary_key();
+        r.unstake_time = unstake_time;
+        r.amount = quantity;
+        r.provider = provider;
+        r.service = service;
+      });
+    }
+    uint64_t secondsLeft = 
+        (unstake_time - current_time_ms) / 1000; // calc how much left
+    if(unstake_time < current_time_ms || secondsLeft == 0)
+      secondsLeft = 1;
+    scheduleRefund(secondsLeft, to, provider, service, quantity.symbol.code());
+  }
+
   ACTION refund(name to, name provider, name service, symbol_code symcode) {
+    //TODO: Lookup for HODL refunds and handle them appropriately
     require_recipient(provider);
     require_recipient(service);
     auto current_time_ms = current_time() / 1000;
@@ -689,6 +746,7 @@ private:
     cancel_deferred(to.value);
     trx.send(to.value, _self, true);
   }
+
   void applyInflation() {
     auto sym = DAPPSERVICES_SYMBOL;
     stats_ext statsexts(_self, sym.code().raw());

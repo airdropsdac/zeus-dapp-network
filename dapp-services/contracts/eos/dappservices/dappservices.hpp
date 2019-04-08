@@ -343,6 +343,13 @@ struct usage_t {
     }
   };
 
+  // how much stake belongs to AirHODLd tokens
+  TABLE stakehodl {
+    uint64_t id;
+    asset balance;
+    uint64_t primary_key() const { return id; }
+  }
+
   typedef eosio::multi_index<
       "refundreq"_n, refundreq,
       indexed_by<"byprov"_n,
@@ -351,6 +358,16 @@ struct usage_t {
                 >
       >
       refunds_table;
+
+  //Duplicate refund table specifically for AirHODL balances
+  typedef eosio::multi_index<
+      "refundhodl"_n, refundreq,
+      indexed_by<"byprov"_n,
+                 const_mem_fun<refundreq, key256,
+                               &refundreq::by_symbol_service_provider>
+                >
+      >
+      hodl_refunds_table;    
 
   typedef eosio::multi_index<
       "package"_n, package,
@@ -362,6 +379,8 @@ struct usage_t {
   typedef eosio::multi_index<"stat"_n, currency_stats> stats;
   typedef eosio::multi_index<"statext"_n, currency_stats_ext> stats_ext;
   typedef eosio::multi_index<"accounts"_n, account> accounts;
+  typedef eosio::multi_index<"stakehodl"_n, stakehodl> stakehodl_t; //track how much of a stake is airhodled tokens
+  typedef eosio::multi_index<"acctshodl"_n, account> acctshodl; //duplicate account table for airhodl quantities
   typedef eosio::multi_index<"reward"_n, reward> rewards_t;
   
   
