@@ -461,42 +461,82 @@ public:
       secondsLeft = 1;
     scheduleRefund(secondsLeft, to, provider, service, quantity.symbol.code());
   }
-
+  
   ACTION refund(name to, name provider, name service, symbol_code symcode) {
-    //TODO: Lookup for HODL refunds and handle them appropriately
+    //AIRHODL READY
     require_recipient(provider);
     require_recipient(service);
     auto current_time_ms = current_time() / 1000;
+
+    //Search for normal refunds
     refunds_table refunds_tbl(_self, to.value);
     auto idxKey =
         refundreq::_by_symbol_service_provider(symcode, service, provider);
     auto cidx = refunds_tbl.get_index<"byprov"_n>();
     auto req = cidx.find(idxKey);
-    eosio_assert(req != cidx.end(), "refund request not found");
+
+    //Search for HODL refunds
+    hodl_refund refunds_tbl2(_self, to.value);
+    auto idxKey2 =
+        refundreq::_by_symbol_service_provider(symcode, service, provider);
+    auto cidx2 = refunds_tbl2.get_index<"byprov"_n>();
+    auto req2 = cidx2.find(idxKey2);
+
+    eosio_assert(req != cidx.end() || req2 != cidx2.end(), "refund request not found")
     dist_rewards(to, provider, service);
-    uint64_t secondsLeft = 
-        (req->unstake_time - current_time_ms) / 1000; // calc how much left
+    
+    //use a single schedule refund if there is still time to wait    
+    uint64_t secondsLeft = (req->unstake_time - current_time_ms) / 1000; // calc how much left
+    uint64_t secondsLeft2 = (req2->unstake_time - current_time_ms) / 1000; // calc how much left
+
     if(req->unstake_time < current_time_ms)
       secondsLeft = 0;
-    if (secondsLeft > 0) {
-      scheduleRefund(secondsLeft, to, provider, service, symcode);
+    if(req2->unstake_time < current_time_ms)
+      secondsLeft2 = 0;
+
+    if(secondsLeft > 0 && secondsLeft2 > 0) 
+      scheduleRefund(min(secondsLeft,secondsLeft2), to, provider, service, symcode);
       return;
     }
 
-    auto quantity = req->amount;
+    if(secondsLeft > 0) 
+      scheduleRefund(secondsLeft, to, provider, service, symcode);      
+    }
+
+    if(secondsLeft2 > 0) 
+      scheduleRefund(secondsLeft2, to, provider, service, symcode);
+    }
+
     accountexts_t accountexts(_self, DAPPSERVICES_SYMBOL.code().raw());
     auto idxKeyAcct =
         accountext::_by_account_service_provider(to, service, provider);
     auto cidxacct = accountexts.get_index<"byprov"_n>();
     auto acct = cidxacct.find(idxKeyAcct);
+
+    //
     if(acct != cidxacct.end()){
-      if(quantity > acct->balance)
-        quantity = acct->balance;
-      sub_provider_balance(to, service, provider, quantity);
-      sub_total_staked(quantity);
-      add_balance(to, quantity, to);
+      if(secondsLeft == 0) {
+        //handle normal request
+        auto quantity = req->amount;     
+        if(quantity > acct->balance) //
+          quantity = acct->balance;
+        sub_provider_balance(to, service, provider, quantity);
+        sub_total_staked(quantity);
+        add_balance(to, quantity, to);
+        cidx.erase(req);
+      }
+
+      if(secondsLeft2 == 0) {
+        //handle HODL request
+        auto quantity = req2->amount;
+        if(quantity > acct->balance)
+          quantity = acct->balance;
+        sub_provider_balance(to, service, provider, quantity);
+        sub_total_staked(quantity);
+        sub_hodl_stake(to, service, provider, quantity);
+        cidx2.erase(req2);
+      }
     }
-    cidx.erase(req);
   }
 
   ACTION usage(usage_t usage_report) {
@@ -660,9 +700,37 @@ public:
     dist_rewards(to, provider, service);
     auto current_time_ms = current_time() / 1000;
     uint64_t unstake_time = current_time_ms + getUnstakeRemaining(to,provider,service);
+
+    //delete the stake entry
+    //ensure the unstake quantity does not exceed the staked quantity
+
+    //find id of selected package                          
+    accountexts_t accountexts(_self, DAPPSERVICES_SYMBOL.code().raw());
+    auto idxKey =
+        accountext::_by_account_service_provider(owner, service, provider);
+    auto cidx = accountexts.get_index<"byprov"_n>();
+    auto acct = cidx.find(idxKey);
+
+    eosio_assert(acct != cidx.end(), "must choose package first");
+
+    //find an existing or new stake using the id
+    hodl_stakes hodlstakes(_self, DAPPSERVICES_SYMBOL.code().raw());
+    auto stake = hodlstakes.find(acct->id);
+    eosio_assert(stake != hodlstakes.end(), "no hodl stake found for this package");
+
+    auto unstake = quantity;
+
+    //update or delete stake
+    if(quantity < stake->balance) {
+      hodlstakes.modify(stake, _self, [&](auto &a) { 
+        a.balance -= quantity;
+      });
+    } else {
+      unstake = stake->balance;
+      hodlstakes.erase(stake);
+    }
     
     // set account->provider->service->unstake_time
-
     hodl_refunds refunds_tbl(_self, to.value);
     auto idxKey = refundreq::_by_symbol_service_provider(
         quantity.symbol.code(), service, provider);
@@ -671,13 +739,13 @@ public:
     if (req != cidx.end()) {
       cidx.modify(req, eosio::same_payer, [&](refundreq &r) {
         r.unstake_time = unstake_time;
-        r.amount += quantity;
+        r.amount += unstake;
       });
     } else {
       refunds_tbl.emplace(to, [&](refundreq &r) {
         r.id = refunds_tbl.available_primary_key();
         r.unstake_time = unstake_time;
-        r.amount = quantity;
+        r.amount = unstake;
         r.provider = provider;
         r.service = service;
       });
@@ -744,8 +812,6 @@ private:
     });
     
   }
-
-
   //AIRHODL END
 
   inline void sub_total_staked(asset quantity) {
