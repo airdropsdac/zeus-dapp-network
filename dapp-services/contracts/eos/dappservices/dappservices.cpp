@@ -18,6 +18,7 @@ using namespace std;
 CONTRACT dappservices : public eosio::contract {
 public:
   using contract::contract;
+
   TABLE account {
     asset balance;
     uint64_t primary_key() const { return balance.symbol.code().raw(); }
@@ -341,15 +342,7 @@ public:
     applyInflation();
     sub_balance(from, quantity);
     add_balance(to, quantity, payer);
-  }
-
-
-  ACTION issuehodl(name to, asset quantity, string memo) {
-    //TODO: issue HODL tokens
-  }
-  ACTION withdraw(name to) {
-    //TODO: withdraw all available vested airhodl tokens
-  }
+  }  
 
   ACTION open(name owner, symbol_code symbol, name ram_payer) {
     require_auth(ram_payer);
@@ -432,16 +425,6 @@ public:
     add_total_staked(quantity);
   }
 
-  ACTION stakehodl(name from, name provider, name service, asset quantity) {
-    require_auth(from);
-    require_recipient(provider);
-    require_recipient(service);
-    dist_rewards(from, provider, service);
-    add_provider_balance(from, service, provider, quantity);
-    //TODO: add_hodl_stake(from, service, provider, quantity);
-    sub_balance(from, quantity); //TODO: Update to sub_hodl_balance
-    add_total_staked(quantity); 
-  }
 
   ACTION unstake(name to, name provider, name service, asset quantity) {
     require_auth(to);
@@ -454,42 +437,6 @@ public:
     // set account->provider->service->unstake_time
 
     refunds_table refunds_tbl(_self, to.value);
-    auto idxKey = refundreq::_by_symbol_service_provider(
-        quantity.symbol.code(), service, provider);
-    auto cidx = refunds_tbl.get_index<"byprov"_n>();
-    auto req = cidx.find(idxKey);
-    if (req != cidx.end()) {
-      cidx.modify(req, eosio::same_payer, [&](refundreq &r) {
-        r.unstake_time = unstake_time;
-        r.amount += quantity;
-      });
-    } else {
-      refunds_tbl.emplace(to, [&](refundreq &r) {
-        r.id = refunds_tbl.available_primary_key();
-        r.unstake_time = unstake_time;
-        r.amount = quantity;
-        r.provider = provider;
-        r.service = service;
-      });
-    }
-    uint64_t secondsLeft = 
-        (unstake_time - current_time_ms) / 1000; // calc how much left
-    if(unstake_time < current_time_ms || secondsLeft == 0)
-      secondsLeft = 1;
-    scheduleRefund(secondsLeft, to, provider, service, quantity.symbol.code());
-  }
-
-  ACTION unstakehodl(name to, name provider, name service, asset quantity) {
-    require_auth(to);
-    require_recipient(provider);
-    require_recipient(service);
-    dist_rewards(to, provider, service);
-    auto current_time_ms = current_time() / 1000;
-    uint64_t unstake_time = current_time_ms + getUnstakeRemaining(to,provider,service);
-    
-    // set account->provider->service->unstake_time
-
-    hodl_refunds_table refunds_tbl(_self, to.value);
     auto idxKey = refundreq::_by_symbol_service_provider(
         quantity.symbol.code(), service, provider);
     auto cidx = refunds_tbl.get_index<"byprov"_n>();
@@ -590,7 +537,217 @@ public:
         .send();
   }
 
+  // AIRHODL START
+
+  ACTION inithodl() {
+    require_auth(_self);
+    auto sym = DAPPSERVICES_SYMBOL;
+    auto zero_asset = asset(0,sym);
+
+    hodl_stats statstable(_self, sym.code().raw());
+    auto existing = statstable.find(sym.code().raw());
+    eosio_assert(existing == statstable.end(), "token with symbol already exists");
+
+    statstable.emplace(_self, [&](auto &s) {
+      s.total_hodl    = zero_asset;
+      s.forfeit_hodl  = zero_asset;
+      s.hodl_start    = time_point_sec.min();
+      s.hodl_end      = time_point_sec.min();
+    });
+  }
+
+  ACTION starthodl(time_point_sec hodl_start, time_point_sec hodl_end) {
+    require_auth(_self);
+    auto sym = DAPPSERVICES_SYMBOL;
+    hodl_stats statstable(_self, sym.code().raw());
+    auto existing = statstable.find(sym.code().raw());
+    eosio_assert(existing != statstable.end(),
+                 "token with symbol does not exist, create token before issue");
+    const auto &st = *existing;    
+    statstable.modify(st, eosio::same_payer, [&](auto &s) {
+      s.hodl_start  = hodl_start;
+      s.hodl_end    = hodl_end;
+    });
+  }
+
+  ACTION issuehodl(name to, asset quantity, string memo) {
+    //issue to the hodl reserve
+    //using issue assumes we have issuer auth
+    issue("dapphodlrsrv"_n,quantity,memo);
+
+    //find the issuer
+    auto sym = quantity.symbol;
+    auto sym_name = sym.code().raw();
+    stats statstable(_self, sym_name);
+    auto existing = statstable.find(sym_name);
+    eosio_assert(existing != statstable.end(),
+                 "token with symbol does not exist, create token before issue");
+    const auto &st = *existing;
+
+    //add the balance
+    add_hodl_balance(to,quantity,st.issuer);
+  }
+
+  ACTION withdraw(name to) {
+    //withdrawal will withdraw 100% of available hodled tokens
+    //we assume we only have DAPP token
+    
+    require_auth(to);
+
+    //Find token stats
+    auto sym = DAPPSERVICES_SYMBOL;
+    hodl_stats statstable(_self, sym.code().raw());
+    auto existing = statstable.find(sym.code().raw());
+    eosio_assert(existing != statstable.end(),
+                 "token with symbol does not exist, create token before issue");
+    const auto &st = *existing;  
+
+    //Check if vesting has started
+    eosio_assert(st.hodl_start > time_point_sec.min(),"AirHODL vesting has not yet started");
+
+    //Find hodlaccts
+    hodl_accts from_acnts(_self, to.value);
+    const auto &from = from_acnts.get(sym.code().raw(), "no AirHODL balance object found");
+    
+    //Ensure that stake is 0
+    eosio_assert(from.staked.quantity == 0, "you must unstake all AirHODL stakes to withdraw");
+
+    //calculate vesting ratio
+    double time_elapsed = double(time_point_sec(current_time_point()) - st.hodl_start);
+    double vesting_duration = double(st.hodl_end - st.hodl_start);
+    double vesting_ratio = time_elapsed / vesting;
+
+    //calculate vested_balance
+    uint64_t balance_vested = static_cast<uint64_t>(vesting_ratio * double(from.balance.quantity));
+    uint64_t balance_forfeited = from.balance.quantity - balance_vested;
+    double bonus_share = double(st.forfeit_hodl.quantity) * (double(from.balance.quantity) / double(st.total_hodl.quantity));
+    uint64_t bonus_vested = static_cast<uint64_t>(vesting_ratio * bonus_share);
+    asset payout = asset(balance_vested + bonus_vested, sym);
+
+    //update tables
+    statstable.modify(st, eosio::same_payer, [&](auto &s) {
+      //decrease total hodl by the amount paid out
+      s.total_hodl -= (balance_vested + bonus_vested); 
+      //increase forfeight hodl by forfeight balance, but subtract paid out forfeitures
+      s.forfeit_hodl += (balance_forfeited - bonus_vested); 
+    });
+
+    //erase hodlaccts table
+    from_acnts.erase(from);
+
+    //transfer DAPP tokens
+    action(permission_level{"dapphodlrsrv"_n, "transfer"_n}, _self, "transfer"_n,
+        std::make_tuple("dapphodlrsrv"_n, to, payout, std::string("Withdraw vested AirHODL tokens")))
+    .send();
+  }
+
+
+  ACTION stakehodl(name from, name provider, name service, asset quantity) {
+    require_auth(from);
+    require_recipient(provider);
+    require_recipient(service);
+    dist_rewards(from, provider, service);
+    add_provider_balance(from, service, provider, quantity);
+    add_hodl_stake(from, service, provider, quantity);
+    add_total_staked(quantity); 
+  }
+
+
+  ACTION unstakehodl(name to, name provider, name service, asset quantity) {
+    require_auth(to);
+    require_recipient(provider);
+    require_recipient(service);
+    dist_rewards(to, provider, service);
+    auto current_time_ms = current_time() / 1000;
+    uint64_t unstake_time = current_time_ms + getUnstakeRemaining(to,provider,service);
+    
+    // set account->provider->service->unstake_time
+
+    hodl_refunds refunds_tbl(_self, to.value);
+    auto idxKey = refundreq::_by_symbol_service_provider(
+        quantity.symbol.code(), service, provider);
+    auto cidx = refunds_tbl.get_index<"byprov"_n>();
+    auto req = cidx.find(idxKey);
+    if (req != cidx.end()) {
+      cidx.modify(req, eosio::same_payer, [&](refundreq &r) {
+        r.unstake_time = unstake_time;
+        r.amount += quantity;
+      });
+    } else {
+      refunds_tbl.emplace(to, [&](refundreq &r) {
+        r.id = refunds_tbl.available_primary_key();
+        r.unstake_time = unstake_time;
+        r.amount = quantity;
+        r.provider = provider;
+        r.service = service;
+      });
+    }
+    uint64_t secondsLeft = 
+        (unstake_time - current_time_ms) / 1000; // calc how much left
+    if(unstake_time < current_time_ms || secondsLeft == 0)
+      secondsLeft = 1;
+    scheduleRefund(secondsLeft, to, provider, service, quantity.symbol.code());
+  }
+
+  
+
 private:
+  
+  void add_hodl_balance(name owner, asset quantity, name ram_payer) {
+    hodl_accts to_acnts(_self, owner.value);
+    auto to = to_acnts.find(quantity.symbol.code().raw());
+    if (to == to_acnts.end()) {
+      to_acnts.emplace(ram_payer, [&](auto &a) { 
+        a.balance = quantity; 
+        a.stake = asset(0,quantity.symbol);
+      });
+    } else {
+      to_acnts.modify(to, eosio::same_payer,
+                      [&](auto &a) { a.balance += quantity; });
+    }
+  }
+  
+  void add_hodl_stake(name owner, name service, name provider,
+                            asset quantity) {
+    //find id of selected package                          
+    accountexts_t accountexts(_self, DAPPSERVICES_SYMBOL.code().raw());
+    auto idxKey =
+        accountext::_by_account_service_provider(owner, service, provider);
+    auto cidx = accountexts.get_index<"byprov"_n>();
+    auto acct = cidx.find(idxKey);
+
+    eosio_assert(acct != cidx.end(), "must choose package first");
+
+    //find an existing or new stake using the id
+    hodl_stakes hodlstakes(_self, DAPPSERVICES_SYMBOL.code().raw());
+    auto stake = hodlstakes.find(acct->id);
+
+    //add or insert the stake
+    if(stake != hodlstakes.end()) {
+      hodlstakes.modify(stake, _self, [&](auto &a) { 
+        a.balance += quantity;
+      });
+    } else {
+      hodlstakes.emplace(_self, [&](auto &a) { 
+        a.id = acct->id;
+        a.account = owner;
+        a.balance = quantity;
+      });
+    }
+
+    //update the staked number
+    hodl_accts from_acnts(_self, owner.value);
+    const auto &from = from_acnts.get(quantity.symbol.code().raw(), "you don't have AirHODL tokens");
+    from_acnts.modify(from, eosio::same_payer, [&](auto &a) { 
+      a.staked += quantity; 
+      eosio_assert(a.staked <= a.balance, "total AirHODL stake may not exceed balance");
+    });
+    
+  }
+
+
+  //AIRHODL END
+
   inline void sub_total_staked(asset quantity) {
     stats_ext statsexts(_self, quantity.symbol.code().raw());
     auto existing = statsexts.find(quantity.symbol.code().raw());
@@ -614,6 +771,7 @@ private:
     statsexts.modify(st, eosio::same_payer,
                      [&](auto &s) { s.staked += quantity; });
   }
+
   void sub_balance(name owner, asset quantity) {
     accounts from_acnts(_self, owner.value);
 
@@ -645,7 +803,7 @@ private:
       a.total_staked -= quantity; 
     });
   }
-  
+
   void add_provider_balance(name owner, name service, name provider,
                             asset quantity) {
     accountexts_t accountexts(_self, DAPPSERVICES_SYMBOL.code().raw());
@@ -673,8 +831,9 @@ private:
         a.balance.symbol = quantity.symbol;
       });
     }
-
   }
+
+
   void choose_package(name owner, name service, name provider, name package) {
     accountexts_t accountexts(_self, DAPPSERVICES_SYMBOL.code().raw());
     auto idxKey =
@@ -734,6 +893,8 @@ private:
                       [&](auto &a) { a.balance += quantity; });
     }
   }
+
+  
 
   void scheduleRefund(uint32_t seconds, name to, name provider, name service,
                       symbol_code symcode) {

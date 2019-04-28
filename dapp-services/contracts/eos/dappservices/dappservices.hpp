@@ -223,12 +223,6 @@ struct usage_t {
   }                                                                            \
   }
 
-
-
-
-
-
-
 #define HANDLECASE_SIGNAL_TYPE(signal)                                         \
   if (action == TONAME(signal)) {                                              \
     _xsignal_provider<SIGNAL_NAME(signal)>(                                    \
@@ -343,13 +337,6 @@ struct usage_t {
     }
   };
 
-  // how much stake belongs to AirHODLd tokens
-  TABLE stakehodl {
-    uint64_t id;
-    asset balance;
-    uint64_t primary_key() const { return id; }
-  }
-
   typedef eosio::multi_index<
       "refundreq"_n, refundreq,
       indexed_by<"byprov"_n,
@@ -358,16 +345,6 @@ struct usage_t {
                 >
       >
       refunds_table;
-
-  //Duplicate refund table specifically for AirHODL balances
-  typedef eosio::multi_index<
-      "refundhodl"_n, refundreq,
-      indexed_by<"byprov"_n,
-                 const_mem_fun<refundreq, key256,
-                               &refundreq::by_symbol_service_provider>
-                >
-      >
-      hodl_refunds_table;    
 
   typedef eosio::multi_index<
       "package"_n, package,
@@ -378,9 +355,7 @@ struct usage_t {
 
   typedef eosio::multi_index<"stat"_n, currency_stats> stats;
   typedef eosio::multi_index<"statext"_n, currency_stats_ext> stats_ext;
-  typedef eosio::multi_index<"accounts"_n, account> accounts;
-  typedef eosio::multi_index<"stakehodl"_n, stakehodl> stakehodl_t; //track how much of a stake is airhodled tokens
-  typedef eosio::multi_index<"acctshodl"_n, account> acctshodl; //duplicate account table for airhodl quantities
+  typedef eosio::multi_index<"accounts"_n, account> accounts;  
   typedef eosio::multi_index<"reward"_n, reward> rewards_t;
   
   
@@ -394,6 +369,42 @@ struct usage_t {
                                &accountext::by_account_service>>
                                >
       accountexts_t; 
+
+  //AIRHODL START
+
+  TABLE hodlstat {
+    asset total_hodl;
+    asset total_forfeit;
+    time_point_sec hodl_start;
+    time_point_sec hodl_end;
+    uint64_t primary_key() const { return total_hodl.symbol.code().raw(); }
+  }
+
+  // how much stake belongs to AirHODLd tokens
+  TABLE hodlacct {
+    asset balance;
+    asset staked; //needs to be 0 to withdraw
+    uint64_t primary_key() const { return balance.symbol.code().raw(); }
+  }
+
+  // how much stake belongs to AirHODLd tokens
+  TABLE hodlstake {
+    uint64_t id;
+    name account;
+    asset balance;
+    uint64_t primary_key() const { return id; }
+    uint64_t by_account() const return { account.value; }
+  }
+
+  typedef eosio::multi_index<"hodlstats"_n, hodlstat>     hodl_stats;
+  typedef eosio::multi_index<"hodlstakes"_n, hodlstake>   hodl_stakes;
+  typedef eosio::multi_index<"hodlaccts"_n, hodlacct>     hodl_accts;
+  typedef eosio::multi_index<"hodlrefund"_n, refundreq,
+    indexed_by<"byprov"_n, const_mem_fun<refundreq, key256, &refundreq::by_symbol_service_provider>>
+  >                                                       hodl_refund;    
+
+
+  //AIRHODL END
 
 std::vector<name> getProvidersForAccount(name account, name service) {       
   // get from service account                                                
