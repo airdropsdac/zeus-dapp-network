@@ -269,6 +269,29 @@ struct usage_t {
     }
   };
 
+  TABLE new_refundreq {
+    //we scope to the payer
+    uint64_t id;
+    asset amount;
+
+    name account; //the account that was staked to
+    name source; //the account that was staked from (should either be account, payer, or hodl)
+    name provider;
+    name service;
+
+    uint64_t unstake_time;
+    uint64_t primary_key() const { return id; }
+    key256 by_symbol_account_service_provider() const {
+      return _by_symbol_account_service_provider(amount.symbol.code(), service,
+                                           provider);
+    }
+    static key256 _by_symbol_account_service_provider(symbol_code symbolCode, name account,
+                                                name service, name provider) {
+      return key256::make_from_word_sequence<uint64_t>(
+          symbolCode.raw(), account.value, service.value, provider.value);
+    }
+  };
+
   TABLE package {
     uint64_t id;
     
@@ -377,9 +400,9 @@ struct usage_t {
     uint64_t id; //id just to make things unique
 
     uint64_t acctid; //references accountext id
-    name account;
-    name payer;
-    name source;
+    name account;   //account that was staked to
+    name payer;     //account paying the stake
+    name source;    //account that provided the stake, either account, payer, or hodl
 
     asset balance;
 
