@@ -370,6 +370,42 @@ struct usage_t {
                                >
       accountexts_t; 
 
+
+  //THIRD PARTY STAKING
+
+  TABLE staking {
+    uint64_t id; //id just to make things unique
+
+    uint64_t acctid; //references accountext id
+    name account;
+    name payer;
+    name source;
+
+    asset balance;
+
+    uint64_t primary_key() const { return id; }
+
+    key256 by_account_payer_source() const {
+      return _by_account_payer_source(acctid, account, payer, source);
+    }
+
+    static key256 _by_account_payer_source(uint64_t acctid, name account,
+                                                 name payer, name source) {
+      return key256::make_from_word_sequence<uint64_t>(
+           acctid, account.value, payer.value, source.value);
+    }
+  };
+
+  typedef eosio::multi_index<
+      "staking"_n, staking,
+      indexed_by<"byext"_n,
+                 const_mem_fun<staking, key256,
+                               &staking::by_account_payer_source>>
+                >
+      staking_t; 
+
+  //END THIRD PARTY STAKING    
+
   //AIRHODL START
 
   TABLE hodlstat {
@@ -388,16 +424,16 @@ struct usage_t {
   }
 
   // how much stake belongs to AirHODLd tokens
-  TABLE hodlstake {
-    uint64_t id;
-    name account;
-    asset balance;
-    uint64_t primary_key() const { return id; }
-    uint64_t by_account() const return { account.value; }
-  }
+  // TABLE hodlstake {
+  //   uint64_t id;
+  //   name account;
+  //   asset balance;
+  //   uint64_t primary_key() const { return id; }
+  //   uint64_t by_account() const return { account.value; }
+  // }
 
   typedef eosio::multi_index<"hodlstats"_n, hodlstat>     hodl_stats;
-  typedef eosio::multi_index<"hodlstakes"_n, hodlstake>   hodl_stakes;
+  // typedef eosio::multi_index<"hodlstakes"_n, hodlstake>   hodl_stakes;
   typedef eosio::multi_index<"hodlaccts"_n, hodlacct>     hodl_accts;
   typedef eosio::multi_index<"hodlrefund"_n, refundreq,
     indexed_by<"byprov"_n, const_mem_fun<refundreq, key256, &refundreq::by_symbol_service_provider>>
